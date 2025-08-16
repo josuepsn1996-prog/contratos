@@ -1,0 +1,5 @@
+openai
+streamlit
+pymupdf
+pillow
+pandas
