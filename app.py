@@ -49,7 +49,6 @@ if uploaded_file and api_key:
 
     if is_digital:
         st.info("Extrayendo texto directamente (rápido y barato)...")
-        # Usa el texto extraído directamente
         for i, page_text in enumerate(digital_texts):
             st.write(f"Procesando página {i + 1} de {len(doc)} (digital)...")
             all_texts.append(page_text)
@@ -112,150 +111,11 @@ if uploaded_file and api_key:
     st.markdown("### Lista consolidada de elementos legales (análisis general):")
     st.markdown(resultado)
 
-    # --- SEGUNDA PASADA (Prompts estrictos para máxima precisión) ---
-
-    st.markdown("## 🔎 Revisión IA enfocada en elementos críticos:")
-
-    # Montos
-    prompt_montos = (
-        "Del siguiente texto de contrato, extrae TODOS los montos, cantidades monetarias y formas de pago, tal como aparecen (no infieras, solo copia textualmente). "
-        "Incluye conceptos como anticipo, pagos, total de contrato, retenciones, penalizaciones, garantías y cualquier cifra monetaria relevante. "
-        "Escribe exactamente como aparece, incluyendo separadores, comas, decimales, signos de moneda, etc. "
-        "NO transformes ni resumas, solo copia lo que ves. "
-        "Lista cada monto y su contexto."
-        "\n\nTexto:\n" + full_text
-    )
-    response_montos = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de montos, cantidades y su contexto, copiados textualmente."},
-            {"role": "user", "content": prompt_montos}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### 💰 Montos y cantidades:")
-    st.markdown(response_montos.choices[0].message.content)
-
-    # Porcentajes
-    prompt_porcentajes = (
-        "Del siguiente texto de contrato, extrae todos los porcentajes que aparezcan, incluyendo símbolos %, fracciones o proporciones relacionadas con anticipos, penalizaciones, garantías, retenciones y pagos. "
-        "Escribe exactamente lo que aparece en el texto, SIN transformar a decimales ni modificar el formato original. "
-        "Si aparece '15%' y después entre paréntesis 'quince por ciento', escribe todo así: '15% (quince por ciento)'. "
-        "No realices conversiones, ni infieras, ni resumas. Copia literalmente el formato, los errores y las palabras. Lista cada porcentaje y su contexto."
-        "\n\nTexto:\n" + full_text
-    )
-    response_porcentajes = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de porcentajes encontrados y su contexto, exactamente como aparecen."},
-            {"role": "user", "content": prompt_porcentajes}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### 📊 Porcentajes:")
-    st.markdown(response_porcentajes.choices[0].message.content)
-
-    # Plazos
-    prompt_plazos = (
-        "Del siguiente texto de contrato, extrae todas las fechas, plazos, periodos, vigencias y tiempos de ejecución o cumplimiento, tal como aparecen (fecha de inicio, fin, duración, periodos de entrega, etc.). "
-        "Copia exactamente como aparece, sin transformar ni resumir. Lista cada plazo con su contexto."
-        "\n\nTexto:\n" + full_text
-    )
-    response_plazos = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de plazos, fechas y periodos encontrados, copiados textualmente."},
-            {"role": "user", "content": prompt_plazos}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### ⏳ Plazos y fechas:")
-    st.markdown(response_plazos.choices[0].message.content)
-
-    # Sanciones / penalizaciones
-    prompt_sanciones = (
-        "Del siguiente texto de contrato, extrae todas las sanciones, penalizaciones, multas o consecuencias por incumplimiento que mencione el texto, con su contexto y condiciones (por ejemplo: montos, porcentajes, plazos asociados). "
-        "Copia los textos tal cual aparecen, sin resumir ni transformar."
-        "\n\nTexto:\n" + full_text
-    )
-    response_sanciones = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de sanciones, penalizaciones y sus condiciones, copiados textualmente."},
-            {"role": "user", "content": prompt_sanciones}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### ⚠️ Sanciones y penalizaciones:")
-    st.markdown(response_sanciones.choices[0].message.content)
-
-    # Garantías
-    prompt_garantias = (
-        "Del siguiente texto de contrato, extrae todas las garantías, fianzas y pólizas mencionadas (de cumplimiento, de anticipo, de vicios ocultos, de calidad, etc.), "
-        "especificando el monto o porcentaje y las condiciones. Copia el texto tal como aparece, sin resumir ni modificar."
-        "\n\nTexto:\n" + full_text
-    )
-    response_garantias = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de garantías y fianzas encontradas, copiados textualmente y con sus condiciones."},
-            {"role": "user", "content": prompt_garantias}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### 🛡️ Garantías y fianzas:")
-    st.markdown(response_garantias.choices[0].message.content)
-
-    # Firmas
-    prompt_firmas = (
-        "Del siguiente texto de contrato, extrae únicamente los nombres de todas las personas que aparecen como firmantes, representantes legales o testigos. "
-        "No infieras ni omitas nombres. Copia los nombres tal como aparecen y agrúpalos por parte o función (ejemplo: representante de la entidad, representante del contratista, testigos, etc.)."
-        "\n\nTexto:\n" + full_text
-    )
-    response_firmas = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de nombres de firmantes y su función, copiados exactamente como aparecen."},
-            {"role": "user", "content": prompt_firmas}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### ✍️ Firmas y firmantes:")
-    st.markdown(response_firmas.choices[0].message.content)
-
-    # Modificaciones
-    prompt_modificaciones = (
-        "Del siguiente texto de contrato, extrae todas las referencias a modificaciones, ampliaciones, reducciones, ajustes de monto, cambio de plazos, "
-        "procedimientos para modificar el contrato, requisitos para modificaciones y condiciones bajo las cuales es posible modificar cualquier parte del contrato. "
-        "Copia el texto tal como aparece y da el mayor contexto posible. No transformes ni resumas, solo copia lo que ves."
-        "\n\nTexto:\n" + full_text
-    )
-    response_modificaciones = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres experto en contratos. Devuelve solo la lista de modificaciones y sus condiciones, copiados textualmente."},
-            {"role": "user", "content": prompt_modificaciones}
-        ],
-        max_tokens=1024,
-    )
-    st.markdown("### ✏️ Modificaciones al contrato:")
-    st.markdown(response_modificaciones.choices[0].message.content)
-
-    # Descarga del análisis completo
-    resultado_completo = (
-        "# Lista general consolidada\n" + resultado +
-        "\n\n# Montos\n" + response_montos.choices[0].message.content +
-        "\n\n# Porcentajes\n" + response_porcentajes.choices[0].message.content +
-        "\n\n# Plazos y fechas\n" + response_plazos.choices[0].message.content +
-        "\n\n# Sanciones y penalizaciones\n" + response_sanciones.choices[0].message.content +
-        "\n\n# Garantías y fianzas\n" + response_garantias.choices[0].message.content +
-        "\n\n# Firmas y firmantes\n" + response_firmas.choices[0].message.content +
-        "\n\n# Modificaciones al contrato\n" + response_modificaciones.choices[0].message.content
-    )
+    # Descarga solo del análisis general
     st.download_button(
-        "Descargar todo el análisis (Markdown)",
-        data=resultado_completo,
-        file_name="analisis_contrato_publico.md",
+        "Descargar análisis general (Markdown)",
+        data=resultado,
+        file_name="elementos_legales_contrato.md",
         mime="text/markdown"
     )
 else:
