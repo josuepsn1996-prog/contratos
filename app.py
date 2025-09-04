@@ -38,7 +38,6 @@ if uploaded_file and api_key:
     for page in doc:
         page_text = page.get_text("text")
         digital_texts.append(page_text)
-        # Si una página tiene muy poco texto, es probable que sea imagen escaneada
         if len(page_text.strip()) < 30:
             is_digital = False
 
@@ -49,7 +48,6 @@ if uploaded_file and api_key:
 
     if is_digital:
         st.info("Extrayendo texto directamente (rápido y barato)...")
-        # Usa el texto extraído directamente
         for i, page_text in enumerate(digital_texts):
             st.write(f"Procesando página {i + 1} de {len(doc)} (digital)...")
             all_texts.append(page_text)
@@ -93,24 +91,28 @@ if uploaded_file and api_key:
     full_text = "\n\n".join(all_texts)
     prompt_final = (
         "A continuación tienes el texto relevante extraído de todas las páginas de un contrato de la administración pública mexicana. "
-        "Estructura una lista consolidada, clara y profesional de los siguientes elementos clave del contrato, usando exactamente este orden y formato, "
-        "y asegurando que SIEMPRE se incluya cada uno de los siguientes campos, aunque no estén presentes (en tal caso, escribe 'NO LOCALIZADO'): \n\n"
-        "1. Partes:\n"
-        "2. Objeto:\n"
-        "3. Monto:\n"
-        "4. Plazo:\n"
-        "5. Garantías:\n"
-        "6. Obligaciones del Proveedor:\n"
-        "7. Supervisión:\n"
-        "8. Penalizaciones:\n"
-        "9. Modificaciones:\n"
-        "10. Normatividad Aplicable:\n"
-        "11. Resolución de Controversias:\n"
-        "12. Firmas:\n"
-        "13. Anexos:\n"
-        "\n"
+        "Estructura una lista consolidada y profesional, usando exactamente este ORDEN y FORMATO (incluyendo negritas, dos puntos y sin explicaciones extra). "
+        "Para cada campo, escribe el título en NEGRITAS y su valor, aunque no estén presentes (en ese caso, escribe 'NO LOCALIZADO'). "
+        "No agregues ningún otro texto ni cambies los nombres de los campos. SIEMPRE usa exactamente los siguientes títulos, este orden y este formato:\n\n"
+        "1. **Partes:**\n"
+        "2. **Objeto:**\n"
+        "3. **Monto:**\n"
+        "4. **Plazo:**\n"
+        "5. **Garantías:**\n"
+        "6. **Obligaciones del Proveedor:**\n"
+        "7. **Supervisión:**\n"
+        "8. **Penalizaciones:**\n"
+        "9. **Modificaciones:**\n"
+        "10. **Normatividad Aplicable:**\n"
+        "11. **Resolución de Controversias:**\n"
+        "12. **Firmas:**\n"
+        "13. **Anexos:**\n\n"
+        "Ejemplo de respuesta:\n"
+        "1. **Partes:** [aquí la información]\n"
+        "2. **Objeto:** [aquí la información]\n"
+        "...y así sucesivamente.\n\n"
         "En cada campo, incluye la información más relevante y completa posible, fusionando datos repetidos y respetando los términos y cifras tal como aparecen. "
-        "Mantén siempre la misma estructura de campos y títulos para todos los contratos. Responde SOLO con la lista estructurada, sin explicaciones extra.\n\n"
+        "Responde SOLO con la lista estructurada, sin explicaciones extra ni campos adicionales.\n\n"
         + full_text
     )
     response_final = openai.chat.completions.create(
