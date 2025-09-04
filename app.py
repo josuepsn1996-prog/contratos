@@ -9,7 +9,7 @@ st.title("📄 Análisis Inteligente de Contratos de la Administración Pública
 
 st.markdown("""
 Carga tu contrato público (PDF, escaneado o digital).  
-La IA extrae y consolida los **elementos legales más importantes** del contrato, con un flujo **más rápido para PDFs digitales**.
+La IA extrae y consolida los **elementos legales más importantes** del contrato, en formato estandarizado y comparativo para todos los casos.
 
 **Necesitas tu clave de API de [OpenAI](https://platform.openai.com/api-keys)**
 """)
@@ -89,36 +89,53 @@ if uploaded_file and api_key:
 
     # Junta todos los textos y consolida
     full_text = "\n\n".join(all_texts)
+
     prompt_final = (
+        "Eres un analista legal automatizado experto en contratos públicos. "
         "A continuación tienes el texto relevante extraído de todas las páginas de un contrato de la administración pública mexicana. "
-        "Estructura una lista consolidada y profesional, usando exactamente este ORDEN y FORMATO (incluyendo negritas, dos puntos y sin explicaciones extra). "
-        "Para cada campo, escribe el título en NEGRITAS y su valor, aunque no estén presentes (en ese caso, escribe 'NO LOCALIZADO'). "
-        "No agregues ningún otro texto ni cambies los nombres de los campos. SIEMPRE usa exactamente los siguientes títulos, este orden y este formato:\n\n"
-        "1. **Partes:**\n"
-        "2. **Objeto:**\n"
-        "3. **Monto:**\n"
-        "4. **Plazo:**\n"
-        "5. **Garantías:**\n"
-        "6. **Obligaciones del Proveedor:**\n"
-        "7. **Supervisión:**\n"
-        "8. **Penalizaciones:**\n"
-        "9. **Modificaciones:**\n"
-        "10. **Normatividad Aplicable:**\n"
-        "11. **Resolución de Controversias:**\n"
-        "12. **Firmas:**\n"
-        "13. **Anexos:**\n\n"
+        "Debes estructurar y presentar SIEMPRE la siguiente lista de elementos legales, usando EXCLUSIVAMENTE los títulos y el ORDEN proporcionado abajo, con el siguiente formato: "
+        "Numera los campos del 1 al 13, cada título va en NEGRITAS (por ejemplo **Partes:**), seguido exactamente por el dato correspondiente. "
+        "Si algún elemento no existe en el contrato o no aparece explícitamente, escribe SOLO la leyenda 'NO LOCALIZADO' en ese campo (sin sinónimos, sin frases tipo 'no se encontró', 'no aplica', 'no especificado', etc). "
+        "NO fusiones campos, NO repitas campos, NO agregues ejemplos, NO cambies el nombre ni el orden de los títulos, NO hagas explicaciones, NO incluyas resumen final ni comentarios. "
+        "No mezcles información de diferentes campos; si hay varios datos, sepáralos por punto y seguido. "
+        "No pongas cargos en Firmas, solo los nombres. No incluyas definiciones. "
+        "Escribe los montos y cifras exactamente como aparezcan, no los transformes ni los resumas. "
+        "Aquí el formato OBLIGATORIO, así debe salir SIEMPRE, con los mismos títulos y formato:\n\n"
+        "1. **Partes:** [dato]\n"
+        "2. **Objeto:** [dato]\n"
+        "3. **Monto:** [dato]\n"
+        "4. **Plazo:** [dato]\n"
+        "5. **Garantías:** [dato]\n"
+        "6. **Obligaciones del Proveedor:** [dato]\n"
+        "7. **Supervisión:** [dato]\n"
+        "8. **Penalizaciones:** [dato]\n"
+        "9. **Modificaciones:** [dato]\n"
+        "10. **Normatividad Aplicable:** [dato]\n"
+        "11. **Resolución de Controversias:** [dato]\n"
+        "12. **Firmas:** [dato]\n"
+        "13. **Anexos:** [dato]\n\n"
         "Ejemplo de respuesta:\n"
-        "1. **Partes:** [aquí la información]\n"
-        "2. **Objeto:** [aquí la información]\n"
-        "...y así sucesivamente.\n\n"
-        "En cada campo, incluye la información más relevante y completa posible, fusionando datos repetidos y respetando los términos y cifras tal como aparecen. "
-        "Responde SOLO con la lista estructurada, sin explicaciones extra ni campos adicionales.\n\n"
+        "1. **Partes:** La Secretaría de Finanzas y Administración del Estado de Durango y la empresa Maquinaria y Edificaciones Doble G, S.A. de C.V. representada por C. Felipe de Jesús García Avendaño y C. Jonathan Moncada Galaviz.\n"
+        "2. **Objeto:** Servicio de fumigaciones para diferentes dependencias.\n"
+        "3. **Monto:** $48,368,544.21 después de impuestos.\n"
+        "4. **Plazo:** Del 14 de junio de 2025 al 31 de diciembre de 2025.\n"
+        "5. **Garantías:** Fianza por el 10% del importe total del contrato.\n"
+        "6. **Obligaciones del Proveedor:** Cumplir con el servicio en tiempo y forma.\n"
+        "7. **Supervisión:** Dirección de Servicios Generales de la Subsecretaría de Administración.\n"
+        "8. **Penalizaciones:** Hasta 300 UMA's más IVA por día de atraso.\n"
+        "9. **Modificaciones:** Permitidas mediante acuerdo escrito entre las partes, hasta un 15% del total.\n"
+        "10. **Normatividad Aplicable:** Ley de Adquisiciones, Arrendamientos y Servicios del Estado de Durango.\n"
+        "11. **Resolución de Controversias:** Tribunales locales del Estado de Durango.\n"
+        "12. **Firmas:** Pedro Josué Herrera Parra. Óscar Manuel Vázquez Pacheco. Felipe de Jesús García Avendaño. Jonathan Moncada Galaviz.\n"
+        "13. **Anexos:** Anexo 1.\n\n"
+        "Responde SOLO con la lista numerada exactamente en ese formato. Aquí está el texto:\n\n"
         + full_text
     )
+
     response_final = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada y consolidada, sin duplicados y siguiendo exactamente los campos y el orden indicados."},
+            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada y consolidada, sin duplicados, sin campos extra y siguiendo EXACTAMENTE los campos y el orden indicados."},
             {"role": "user", "content": prompt_final}
         ],
         max_tokens=4096,
