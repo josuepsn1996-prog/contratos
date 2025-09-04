@@ -87,55 +87,39 @@ if uploaded_file and api_key:
 
     st.info("Consolidando elementos legales con IA...")
 
-    # Junta todos los textos y consolida
     full_text = "\n\n".join(all_texts)
 
+    # PROMPT ULTRA-DETALLADO
     prompt_final = (
-        "Eres un analista legal automatizado experto en contratos públicos. "
+        "Eres un analista legal experto en contratos públicos. "
         "A continuación tienes el texto relevante extraído de todas las páginas de un contrato de la administración pública mexicana. "
-        "Debes estructurar y presentar SIEMPRE la siguiente lista de elementos legales, usando EXCLUSIVAMENTE los títulos y el ORDEN proporcionado abajo, con el siguiente formato: "
-        "Numera los campos del 1 al 13, cada título va en NEGRITAS (por ejemplo **Partes:**), seguido exactamente por el dato correspondiente. "
-        "Si algún elemento no existe en el contrato o no aparece explícitamente, escribe SOLO la leyenda 'NO LOCALIZADO' en ese campo (sin sinónimos, sin frases tipo 'no se encontró', 'no aplica', 'no especificado', etc). "
-        "NO fusiones campos, NO repitas campos, NO agregues ejemplos, NO cambies el nombre ni el orden de los títulos, NO hagas explicaciones, NO incluyas resumen final ni comentarios. "
-        "No mezcles información de diferentes campos; si hay varios datos, sepáralos por punto y seguido. "
-        "No pongas cargos en Firmas, solo los nombres. No incluyas definiciones. "
-        "Escribe los montos y cifras exactamente como aparezcan, no los transformes ni los resumas. "
-        "Aquí el formato OBLIGATORIO, así debe salir SIEMPRE, con los mismos títulos y formato:\n\n"
-        "1. **Partes:** [dato]\n"
-        "2. **Objeto:** [dato]\n"
-        "3. **Monto:** [dato]\n"
-        "4. **Plazo:** [dato]\n"
-        "5. **Garantías:** [dato]\n"
-        "6. **Obligaciones del Proveedor:** [dato]\n"
-        "7. **Supervisión:** [dato]\n"
-        "8. **Penalizaciones:** [dato]\n"
-        "9. **Modificaciones:** [dato]\n"
-        "10. **Normatividad Aplicable:** [dato]\n"
-        "11. **Resolución de Controversias:** [dato]\n"
-        "12. **Firmas:** [dato]\n"
-        "13. **Anexos:** [dato]\n\n"
-        "Ejemplo de respuesta:\n"
-        "1. **Partes:** La Secretaría de Finanzas y Administración del Estado de Durango y la empresa Maquinaria y Edificaciones Doble G, S.A. de C.V. representada por C. Felipe de Jesús García Avendaño y C. Jonathan Moncada Galaviz.\n"
-        "2. **Objeto:** Servicio de fumigaciones para diferentes dependencias.\n"
-        "3. **Monto:** $48,368,544.21 después de impuestos.\n"
-        "4. **Plazo:** Del 14 de junio de 2025 al 31 de diciembre de 2025.\n"
-        "5. **Garantías:** Fianza por el 10% del importe total del contrato.\n"
-        "6. **Obligaciones del Proveedor:** Cumplir con el servicio en tiempo y forma.\n"
-        "7. **Supervisión:** Dirección de Servicios Generales de la Subsecretaría de Administración.\n"
-        "8. **Penalizaciones:** Hasta 300 UMA's más IVA por día de atraso.\n"
-        "9. **Modificaciones:** Permitidas mediante acuerdo escrito entre las partes, hasta un 15% del total.\n"
-        "10. **Normatividad Aplicable:** Ley de Adquisiciones, Arrendamientos y Servicios del Estado de Durango.\n"
-        "11. **Resolución de Controversias:** Tribunales locales del Estado de Durango.\n"
-        "12. **Firmas:** Pedro Josué Herrera Parra. Óscar Manuel Vázquez Pacheco. Felipe de Jesús García Avendaño. Jonathan Moncada Galaviz.\n"
-        "13. **Anexos:** Anexo 1.\n\n"
-        "Responde SOLO con la lista numerada exactamente en ese formato. Aquí está el texto:\n\n"
+        "Debes presentar SIEMPRE la siguiente lista numerada, usando EXCLUSIVAMENTE los títulos y el ORDEN proporcionado, y el formato indicado: "
+        "Numera del 1 al 13. Cada título va en NEGRITAS (por ejemplo **Partes:**), seguido exactamente por el dato correspondiente. "
+        "Si un elemento no existe explícitamente, escribe SOLO la leyenda 'NO LOCALIZADO' (sin sinónimos ni explicaciones). "
+        "No fusiones campos, no repitas campos, no agregues ejemplos, no cambies el nombre ni el orden, no incluyas resumen final, no comentes. "
+        "En cada campo, sigue estas instrucciones para máxima uniformidad:\n\n"
+        "1. **Partes:** Enumera a todas las partes del contrato, indicando nombre completo y el puesto/cargo de cada firmante de cada parte. Ejemplo: 'La Secretaría de Finanzas y Administración del Estado de Durango, representada por el L.E.P. Pedro Josué Herrera Parra, Subsecretario de Administración; y la empresa Maquinaria y Edificaciones Doble G, S.A. de C.V., representada por C. Felipe de Jesús García Avendaño, Administrador Único; y C. Jonathan Moncada Galaviz, Persona Física.'\n"
+        "2. **Objeto:** Describe el objeto del contrato de la forma más específica posible, incluyendo si aplica el tipo de servicio, suministro u obra. No resumas.\n"
+        "3. **Monto:** Desglosa SIEMPRE (si está disponible) en tres líneas: 'Monto antes de IVA: [dato]', 'IVA: [dato]', 'Monto total: [dato]'. Si solo hay uno, indícalo como 'NO LOCALIZADO' en las otras líneas.\n"
+        "4. **Plazo:** Especifica claramente la vigencia, fechas de inicio y fin, y cualquier otra condición temporal. Si hay plazos parciales, desglósalos.\n"
+        "5. **Garantías:** Indica tipo, porcentaje, monto y condiciones de todas las garantías requeridas. No resumas.\n"
+        "6. **Obligaciones del Proveedor:** Lista todas las obligaciones explícitas del proveedor, sin resumir en frases generales, incluyendo entregas, reportes, equipamiento, personal, requisitos técnicos, etc. Una obligación por punto y seguido.\n"
+        "7. **Supervisión:** Señala exactamente qué persona, área o dependencia es responsable de la supervisión. Si hay varias, sepáralas.\n"
+        "8. **Penalizaciones:** Señala todas las penalizaciones, incluyendo monto, porcentaje, UMA's, condiciones y PENALIZACIÓN MÁXIMA. Si no está indicada, escribe 'NO LOCALIZADO' para penalización máxima.\n"
+        "9. **Modificaciones:** Indica el procedimiento para modificaciones (por ejemplo, máximo permitido, requisitos, plazos, autorización, fundamento legal específico).\n"
+        "10. **Normatividad Aplicable:** Lista TODA la normatividad mencionada (leyes, reglamentos, códigos) tal como aparece en el texto. Separa cada norma por punto y seguido. No resumas ni inventes normas no presentes.\n"
+        "11. **Resolución de Controversias:** Especifica el procedimiento y autoridad para la resolución de controversias, y si no hay procedimiento específico, escribe 'NO LOCALIZADO' y después lo que sí esté disponible (por ejemplo: sólo menciona tribunal, pero no procedimientos). Ejemplo: 'NO LOCALIZADO. Sólo se indica jurisdicción de Tribunales Locales del Estado de Durango.'\n"
+        "12. **Firmas:** Enumera el nombre completo y puesto/cargo de cada firmante, agrupando por parte contratante. Ejemplo: 'Por la Secretaría de Finanzas y Administración: L.E.P. Pedro Josué Herrera Parra, Subsecretario de Administración; Ing. Óscar Manuel Vázquez Pacheco, Director de Servicios Generales. Por la empresa: C. Felipe de Jesús García Avendaño, Administrador Único; C. Jonathan Moncada Galaviz, Persona Física.'\n"
+        "13. **Anexos:** Enumera cada anexo por nombre y una breve descripción (por ejemplo: 'Anexo 1: Propuesta técnico-económica aceptada; Anexo 2: Detalle técnico del servicio de fumigación, etc.'). Si sólo aparece el nombre, escríbelo tal cual.\n\n"
+        "Recuerda: Sigue exactamente este formato y nivel de detalle. Si algún campo no tiene información suficiente, pon 'NO LOCALIZADO' sólo en esa línea.\n\n"
+        "Aquí está el texto del contrato:\n\n"
         + full_text
     )
 
     response_final = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada y consolidada, sin duplicados, sin campos extra y siguiendo EXACTAMENTE los campos y el orden indicados."},
+            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada, sin campos extra y siguiendo EXACTAMENTE los campos, formato, y nivel de detalle indicados."},
             {"role": "user", "content": prompt_final}
         ],
         max_tokens=4096,
