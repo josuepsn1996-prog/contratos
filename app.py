@@ -2,23 +2,17 @@ import streamlit as st
 import openai
 import base64
 import tempfile
-import fitz  # PyMuPDF
+import fitz
+import json
+import pandas as pd
 
-st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
-st.title("📄 Análisis Inteligente de Contratos de la Administración Pública")
+st.set_page_config(page_title="Ficha de Contrato Público", page_icon="📄")
+st.title("📄 Ficha Institucional de Contrato de la Administración Pública")
 
 st.markdown("""
 Carga tu contrato público (PDF, escaneado o digital).  
-La IA extrae y consolida los **elementos legales más importantes** del contrato, con un flujo **más rápido para PDFs digitales**.
-
-**Necesitas tu clave de API de [OpenAI](https://platform.openai.com/api-keys)**
+La IA presenta los **elementos legales más importantes** del contrato en una ficha profesional y sistematizada.
 """)
-
-st.warning(
-    "⚠️ Esta app funciona con contratos PDF digitales (texto seleccionable) o escaneados (imagen). "
-    "Si el PDF es digital, el análisis será mucho más rápido y barato. "
-    "La extracción de cifras y porcentajes es textual, sin modificar el formato, para máxima precisión."
-)
 
 api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
 uploaded_file = st.file_uploader("Sube tu contrato en PDF", type=["pdf"])
@@ -30,7 +24,7 @@ if uploaded_file and api_key:
         tmp.write(uploaded_file.read())
         tmp_path = tmp.name
 
-    st.info("Detectando tipo de PDF...")
+    st.info("Procesando archivo...")
 
     doc = fitz.open(tmp_path)
     is_digital = True
@@ -38,25 +32,17 @@ if uploaded_file and api_key:
     for page in doc:
         page_text = page.get_text("text")
         digital_texts.append(page_text)
-        # Si una página tiene muy poco texto, es probable que sea imagen escaneada
         if len(page_text.strip()) < 30:
             is_digital = False
 
-    st.success(f"Tipo de PDF detectado: {'Digital (texto seleccionable)' if is_digital else 'Escaneado (imagen)'}")
-
     all_texts = []
     progress_bar = st.progress(0)
-
     if is_digital:
-        st.info("Extrayendo texto directamente (rápido y barato)...")
         for i, page_text in enumerate(digital_texts):
-            st.write(f"Procesando página {i + 1} de {len(doc)} (digital)...")
             all_texts.append(page_text)
             progress_bar.progress((i+1)/len(doc))
     else:
-        st.info("Convirtiendo páginas a imagen y usando IA Vision para OCR...")
         for i, page in enumerate(doc):
-            st.write(f"Procesando página {i + 1} de {len(doc)} (imagen)...")
             pix = page.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("png")
             img_base64 = base64.b64encode(img_bytes).decode('utf-8')
@@ -64,9 +50,7 @@ if uploaded_file and api_key:
                 {"role": "system", "content": "Eres un experto en contratos públicos y OCR legal."},
                 {"role": "user", "content": [
                     {"type": "text", "text": (
-                        "Lee la imagen adjunta de un contrato, extrae todo el texto útil y, si detectas información de partes, objeto, monto, plazo, garantías, "
-                        "obligaciones, penalizaciones, modificaciones, normatividad aplicable, resolución de controversias, firmas o anexos, indícalo claramente. "
-                        "No agregues explicaciones, solo texto estructurado."
+                        "Lee la imagen adjunta de un contrato, extrae todo el texto útil para estructurar una ficha institucional."
                     )},
                     {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}}
                 ]}
@@ -86,37 +70,93 @@ if uploaded_file and api_key:
         for idx, txt in enumerate(all_texts):
             st.markdown(f"**Página {idx+1}:**\n\n{txt}\n---")
 
-    st.info("Consolidando elementos legales con IA...")
+    st.info("Generando ficha resumen con IA...")
 
-    # Junta todos los textos y consolida
+    # FICHA RESUMEN JSON
     full_text = "\n\n".join(all_texts)
-    prompt_final = (
+    prompt_ficha = (
         "A continuación tienes el texto relevante extraído de todas las páginas de un contrato de la administración pública mexicana. "
-        "Unifica y estructura en una sola lista los ELEMENTOS MÁS IMPORTANTES del contrato (partes, objeto, monto, plazo, garantías, obligaciones, supervisión, penalizaciones, modificaciones, normatividad aplicable, resolución de controversias, firmas y anexos). "
-        "Si algún elemento aparece disperso o repetido, fusiónalo en uno solo, lo más completo posible. Si falta, indícalo como 'NO LOCALIZADO'. "
-        "Responde SOLO con la lista estructurada en markdown, para fácil lectura o copia. Aquí está el texto:\n\n"
+        "Estructura una FICHA RESUMEN del contrato en formato JSON, usando estos campos (rellena todos los posibles, si no está alguno, usa 'No localizado'): "
+        "{"
+        '"partes": [lista de todas las partes], '
+        '"objeto": "", '
+        '"monto_sin_iva": "", '
+        '"iva": "", '
+        '"monto_total": "", '
+        '"plazo_inicio": "", '
+        '"plazo_fin": "", '
+        '"plazo_descripcion": "", '
+        '"garantias": "", '
+        '"obligaciones_proveedor": "", '
+        '"supervision": "", '
+        '"penalizaciones": "", '
+        '"modificaciones": "", '
+        '"normatividad_aplicable": "", '
+        '"resolucion_controversias": "", '
+        '"firmas": [lista de firmantes], '
+        '"anexos": "" '
+        "}. "
+        "Extrae y resume con lenguaje profesional, pero incluye todos los datos, aunque estén repetidos. "
+        "NO generes texto adicional fuera del JSON. Aquí está el texto:\n\n"
         + full_text
     )
-    response_final = openai.chat.completions.create(
+    response_ficha = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada y consolidada, sin duplicados."},
-            {"role": "user", "content": prompt_final}
+            {"role": "system", "content": "Eres experto en contratos públicos y sistematización de información legal."},
+            {"role": "user", "content": prompt_ficha}
         ],
-        max_tokens=4096,
+        max_tokens=2048,
     )
-    resultado = response_final.choices[0].message.content
+    ficha_json = response_ficha.choices[0].message.content
 
-    st.success("¡Análisis general completado!")
-    st.markdown("### Lista consolidada de elementos legales (análisis general):")
-    st.markdown(resultado)
+    try:
+        ficha = json.loads(ficha_json)
+    except Exception as e:
+        st.error("No se pudo procesar el JSON de la ficha. Copia manualmente:\n\n" + ficha_json)
+        ficha = None
 
-    # Descarga solo del análisis general
-    st.download_button(
-        "Descargar análisis general (Markdown)",
-        data=resultado,
-        file_name="elementos_legales_contrato.md",
-        mime="text/markdown"
-    )
+    if ficha:
+        st.markdown("## 🗂️ Ficha institucional del contrato:")
+
+        def fmt(val):
+            if isinstance(val, list):
+                return "\n".join(f"- {v}" for v in val if v.strip())
+            return val if val.strip() else "No localizado"
+
+        cols = {
+            "partes": "Partes",
+            "objeto": "Objeto del Contrato",
+            "monto_sin_iva": "Monto sin IVA",
+            "iva": "IVA",
+            "monto_total": "Monto Total",
+            "plazo_inicio": "Fecha de Inicio",
+            "plazo_fin": "Fecha de Término",
+            "plazo_descripcion": "Descripción de Plazo",
+            "garantias": "Garantías",
+            "obligaciones_proveedor": "Obligaciones del Proveedor",
+            "supervision": "Supervisión",
+            "penalizaciones": "Penalizaciones",
+            "modificaciones": "Modificaciones",
+            "normatividad_aplicable": "Normatividad Aplicable",
+            "resolucion_controversias": "Resolución de Controversias",
+            "firmas": "Firmas",
+            "anexos": "Anexos"
+        }
+
+        df = pd.DataFrame([
+            [cols.get(k, k), fmt(ficha.get(k, "No localizado"))]
+            for k in cols
+        ], columns=["Elemento", "Valor"])
+        st.table(df)
+
+        st.download_button(
+            "Descargar ficha resumen (Excel)",
+            data=df.to_csv(index=False, encoding="utf-8-sig"),
+            file_name="ficha_contrato_publico.csv",
+            mime="text/csv"
+        )
+    else:
+        st.text_area("Ficha extraída (copia manualmente si lo requieres)", ficha_json, height=400)
 else:
     st.info("Sube un PDF y tu clave de OpenAI para comenzar.")
