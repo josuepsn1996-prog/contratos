@@ -5,7 +5,7 @@ import base64
 import tempfile
 import fitz  # PyMuPDF
 
-# --- Configuración de usuarios y contraseñas (diccionario, versión nueva) ---
+# --- Configuración de usuarios y contraseñas ---
 config = {
     'credentials': {
         'usernames': {
@@ -36,18 +36,13 @@ authenticator = stauth.Authenticate(
     'cookie_firma_unica',
     7
 )
-
-# --- IMPORTANTE: argumentos NOMBRADOS ---
-name, authentication_status, username = authenticator.login(
-    form_name='Iniciar sesión',
-    location='main'
-)
+# SOLO argumentos posicionales, NUNCA nombrados:
+name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
     
-    # --- App principal ---
     st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
     st.title("📄 Análisis Inteligente de Contratos de la Administración Pública")
 
