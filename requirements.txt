@@ -2,4 +2,6 @@ openai
 streamlit
 pymupdf
 pillow
+
 pandas
+streamlit-authenticator
