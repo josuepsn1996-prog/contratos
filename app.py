@@ -36,7 +36,7 @@ authenticator = stauth.Authenticate(
     'cookie_firma_unica',
     7
 )
-name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
+name, authentication_status, username = authenticator.login('Iniciar sesión', location='main')
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
@@ -190,3 +190,4 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
