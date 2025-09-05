@@ -36,10 +36,8 @@ authenticator = stauth.Authenticate(
     'cookie_firma_unica',
     7
 )
-name, authentication_status, username = authenticator.login(
-    form_name='Iniciar sesión',
-    location='main'
-)
+# --- IMPORTANTE: argumentos POSICIONALES ---
+name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
