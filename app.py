@@ -37,7 +37,7 @@ authenticator = stauth.Authenticate(
     7
 )
 # --- IMPORTANTE: argumentos POSICIONALES ---
-name, authentication_status, username = authenticator.login('Iniciar sesión', 'app')
+name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
@@ -191,4 +191,5 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
 
