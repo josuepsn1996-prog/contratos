@@ -92,33 +92,57 @@ if uploaded_file and api_key:
     prompt_final = (
         "Eres un analista legal experto en contratos públicos. "
         "Tienes el texto extraído de un contrato de la administración pública mexicana. "
-        "Debes presentar SIEMPRE la siguiente lista numerada, usando EXCLUSIVAMENTE los títulos y el ORDEN proporcionado, en formato claro, formal, homogéneo y fácil de comparar, así:\n\n"
-        "1. **Partes:** Enumera cada parte con nombre oficial, nombre completo y cargo de cada firmante. Agrupa por parte (por ejemplo: 'Por la Secretaría: ...; Por la empresa: ...').\n"
-        "2. **Objeto:** Describe todos los servicios, bienes u obras exactos del contrato, uno por renglón, sin resumir.\n"
-        "3. **Monto:** Presenta así, SIEMPRE, cada línea aparte, con separador de miles y MXN:\n"
-        "   - Monto antes de IVA: $##,###,###.## MXN\n"
-        "   - IVA: $##,###,###.## MXN\n"
-        "   - Monto total: $##,###,###.## MXN\n"
-        "   Si alguno falta, pon 'NO LOCALIZADO' en esa línea. No uses otros formatos ni redacciones. No incluyas decimales innecesarios.\n"
-        "4. **Plazo:** Expresa en formato: 'Inicio: [fecha]. Fin: [fecha]. Vigencia: [periodo].'\n"
-        "5. **Garantías:** Lista tipo, porcentaje y condiciones de cada garantía; una por renglón, usando el formato: 'Tipo: [tipo]. Porcentaje: [% o monto]. Condiciones: [condiciones].'\n"
-        "6. **Obligaciones del Proveedor:** Lista TODAS las obligaciones específicas, una por renglón, literal del contrato. No uses frases generales. No resumas ni combines en un solo párrafo.\n"
-        "7. **Supervisión:** Indica la(s) persona(s), área(s) o dependencia(s) responsables. Un dato por renglón.\n"
-        "8. **Penalizaciones:** Lista cada penalización, con monto/porcentaje y condición, una por renglón. Luego agrega la línea 'Penalización máxima: [dato]'. Si no está, pon 'NO LOCALIZADO'.\n"
-        "9. **Modificaciones:** Indica el procedimiento, máximo permitido (% o monto), plazos y fundamento legal literal.\n"
-        "10. **Normatividad Aplicable:** Lista todas las leyes, reglamentos, normas oficiales mexicanas y códigos citados en el contrato, cada uno en una línea, sin abreviar ni resumir.\n"
-        "11. **Resolución de Controversias:** Si NO hay procedimiento específico, inicia la línea con 'NO LOCALIZADO.' y después copia cualquier mención a jurisdicción/tribunal.\n"
-        "12. **Firmas:** Agrupa firmantes por parte, cada firmante en línea aparte con nombre completo y cargo literal. Ejemplo: 'Por la Secretaría: Nombre, Cargo.'\n"
-        "13. **Anexos:** Para cada anexo, pon el número, nombre y descripción literal. Si sólo hay nombre, pon 'sin descripción'.\n"
-        "Usa negritas solo en títulos. Presenta todas las listas, montos y campos en líneas separadas, nunca pegados ni mezclados. No escribas explicaciones, resúmenes, comentarios ni fusiones. El formato debe ser siempre igual para todos los contratos.\n\n"
-        "Aquí está el texto del contrato:\n\n"
+        "Tu tarea es rellenar la siguiente ficha, con cada campo EXACTAMENTE como se indica. No expliques, no agregues comentarios, no resumas ni fusiones campos. "
+        "No cambies el formato ni los títulos. Usa únicamente la información explícita del texto. Si algo no aparece o está incompleto, escribe 'NO LOCALIZADO'. "
+        "La ficha debe ser homogénea y cada campo fácil de comparar entre contratos. Usa solo texto plano, sin listas, viñetas ni puntos y seguido innecesarios."
+        "\n\n== FICHA ESTANDARIZADA DE CONTRATO DE ADMINISTRACIÓN PÚBLICA ==\n\n"
+        "1. **Partes:**\n"
+        "Por la Secretaría: Nombre completo(s) y cargo(s) exactos de todos los firmantes de la dependencia pública. "
+        "Por el Proveedor: Nombre completo(s), cargo(s) y denominación de la empresa o persona física de todos los firmantes del proveedor. "
+        "No agregues redacción extra ni resumas, sólo nombres y cargos separados por punto y coma."
+        "\n\n2. **Objeto:**\n"
+        "Describe de forma literal todos los servicios, bienes u obras específicos que se enlistan como objeto del contrato, uno por renglón. "
+        "No resumas, no combines, no interpretes, sólo transcribe textualmente todo lo que se considere objeto."
+        "\n\n3. **Monto:**\n"
+        "Monto antes de IVA: $[número con separador de miles, 2 decimales] MXN. "
+        "IVA: $[número con separador de miles, 2 decimales] MXN. "
+        "Monto total: $[número con separador de miles, 2 decimales] MXN. "
+        "Si alguno de estos datos no aparece, pon 'NO LOCALIZADO'."
+        "\n\n4. **Plazo:**\n"
+        "Inicio: [fecha literal]. Fin: [fecha literal]. Vigencia: [periodo o plazo]. "
+        "No combines fechas en un solo renglón, pon cada una donde corresponde. Si falta algún dato, pon 'NO LOCALIZADO'."
+        "\n\n5. **Garantías:**\n"
+        "Tipo: [tipo de garantía, por ejemplo, Cumplimiento o Anticipo]. Porcentaje: [% literal]. Condiciones: [condiciones textuales]. "
+        "Si hay varias garantías, cada una en renglón aparte. Si falta algo, pon 'NO LOCALIZADO'."
+        "\n\n6. **Obligaciones del Proveedor:**\n"
+        "Cada obligación literal, una por renglón, sin resumir ni combinar. No agregues frases generales, sólo lo que aparece explícito en el contrato."
+        "\n\n7. **Supervisión:**\n"
+        "Nombre o cargo de la(s) persona(s), área(s) o dependencia(s) responsables. Un responsable por renglón. No resumas."
+        "\n\n8. **Penalizaciones:**\n"
+        "Cada penalización, monto y condición literal en renglón aparte. Al final, pon 'Penalización máxima: [dato textual]'. Si no está, pon 'NO LOCALIZADO'."
+        "\n\n9. **Modificaciones:**\n"
+        "Procedimiento, límite máximo permitido (% o monto), plazos y fundamento legal, cada elemento en renglón aparte. Si falta algún dato, pon 'NO LOCALIZADO'."
+        "\n\n10. **Normatividad Aplicable:**\n"
+        "Todas las leyes, reglamentos, códigos y normas oficiales mencionadas, cada una en renglón aparte, con nombre completo tal cual. No resumas ni combines."
+        "\n\n11. **Resolución de Controversias:**\n"
+        "Procedimiento específico para resolver controversias, literal. Si NO existe, inicia con 'NO LOCALIZADO.' y luego agrega cualquier mención a tribunal o jurisdicción, tal cual aparezca."
+        "\n\n12. **Firmas:**\n"
+        "Por la Secretaría: Nombre completo(s) y cargo(s) de todos los firmantes. Por el Proveedor: Nombre completo(s), cargo(s) y denominación de la empresa/persona física. Igual que el campo Partes. Sin redacción extra."
+        "\n\n13. **Anexos:**\n"
+        "Para cada anexo, pon el número, nombre literal y breve descripción. Si sólo aparece el nombre, pon 'sin descripción'."
+        "\n\n14. **No localizado:**\n"
+        "Como experto en contratos públicos, menciona brevemente cualquier dato importante, campo o requisito legal del contrato que NO aparezca en la ficha anterior (por ejemplo: falta de garantías, falta de desglose de montos, ausencia de procedimiento de modificación, omisión de firmas obligatorias, etc). Un posible vacío legal por línea. Si todo está, escribe 'Ninguno.'"
+        "\n\n15. **Áreas de mejora:**\n"
+        "Como experto en contratos públicos, señala cualquier parte, redacción o campo que, aunque exista, sea ambiguo, subjetivo, genérico, poco claro, interpretable o pueda dar pie a controversias en la ejecución del contrato. Cada área de mejora por renglón. Si no hay, escribe 'Ninguna.'"
+        "\n\nRecuerda: NO EXPLIQUES ni comentes fuera de los campos anteriores, sólo llena la ficha en ese formato. El resultado debe ser siempre igual en orden, formato y nivel de detalle."
+        "\n\nAquí está el texto del contrato:\n\n"
         + full_text
     )
 
     response_final = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la lista estructurada, sin campos extra y siguiendo EXACTAMENTE los campos, formato, y nivel de detalle indicados."},
+            {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve la ficha estructurada, sin campos extra y siguiendo EXACTAMENTE los campos, formato y nivel de detalle indicados."},
             {"role": "user", "content": prompt_final}
         ],
         max_tokens=4096,
@@ -126,13 +150,13 @@ if uploaded_file and api_key:
     resultado = response_final.choices[0].message.content
 
     st.success("¡Análisis general completado!")
-    st.markdown("### Lista consolidada de elementos legales (análisis general):")
+    st.markdown("### Ficha estandarizada de contrato de administración pública:")
     st.markdown(resultado)
 
     st.download_button(
-        "Descargar análisis general (Markdown)",
+        "Descargar ficha (Markdown)",
         data=resultado,
-        file_name="elementos_legales_contrato.md",
+        file_name="ficha_contrato_publico.md",
         mime="text/markdown"
     )
 else:
