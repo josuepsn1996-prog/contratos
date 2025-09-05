@@ -11,7 +11,7 @@ config = {
         'usernames': {
             'usuario1': {
                 'name': 'Usuario Uno',
-                'password': '$2b$12$HkJ3bRtUYns5A0qhjdcA/umNZydg4xAm4bAYTuKk4EqJrQwCecUv2'  # 1234
+                'password': '$2b$12$O8LiBWotBYppE6OcqJQvFe87a6xw7snhTTlfNgQ7tT1QmepRNxB16'  # 1234
             },
             'usuario2': {
                 'name': 'Usuario Dos',
@@ -190,5 +190,6 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
 
 
