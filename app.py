@@ -5,26 +5,39 @@ import base64
 import tempfile
 import fitz  # PyMuPDF
 
-# --- Configuración de usuarios y contraseñas (hashes ya generados para '1234') ---
-names = ['Usuario Uno', 'Usuario Dos']
-usernames = ['usuario1', 'usuario2']
-passwords = [
-    '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji',  # 1234
-    '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji',  # 1234
-]
+# --- Configuración de usuarios y contraseñas (diccionario, versión nueva) ---
+config = {
+    'credentials': {
+        'usernames': {
+            'usuario1': {
+                'name': 'Usuario Uno',
+                'password': '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji'  # 1234
+            },
+            'usuario2': {
+                'name': 'Usuario Dos',
+                'password': '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji'  # 1234
+            }
+        }
+    },
+    'cookie': {
+        'expiry_days': 7,
+        'key': 'cookie_firma_unica',
+        'name': 'mi_app_streamlit'
+    },
+    'preauthorized': {
+        'emails': []
+    }
+}
 
-authenticator = stauth.Authenticate(
-    names, usernames, passwords,
-    'mi_app_streamlit', 'cookie_firma_unica', cookie_expiry_days=7
-)
-
+# --- Autenticación ---
+authenticator = stauth.Authenticate(config, 'mi_app_streamlit', 'cookie_firma_unica', 7)
 name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
     
-    # --- App principal (igual que tu código original) ---
+    # --- App principal ---
     st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
     st.title("📄 Análisis Inteligente de Contratos de la Administración Pública")
 
