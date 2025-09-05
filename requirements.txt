@@ -2,6 +2,5 @@ openai
 streamlit
 pymupdf
 pillow
-
 pandas
-streamlit-authenticator
+streamlit-authenticator>=0.3.2
