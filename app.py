@@ -11,11 +11,11 @@ config = {
         'usernames': {
             'usuario1': {
                 'name': 'Usuario Uno',
-                'password': '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji'  # 1234
+                'password': '$2b$12$KIXQ0GCXAP5T4n.tzYQyyOjvO7VCM7HeONpSHz5s7aK3O1r4F7r1K'  # 1234
             },
             'usuario2': {
                 'name': 'Usuario Dos',
-                'password': '$2b$12$WrEB8mTcBlJKMlhBQSi2K.g6w86H17OIM1Aj8J6rwWtThvP5r99Ji'  # 1234
+                'password': '$2b$12$KIXQ0GCXAP5T4n.tzYQyyOjvO7VCM7HeONpSHz5s7aK3O1r4F7r1K'  # 1234
             }
         }
     },
@@ -190,3 +190,4 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
