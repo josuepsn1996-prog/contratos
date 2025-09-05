@@ -3,5 +3,6 @@ streamlit
 pymupdf
 pillow
 pandas
-streamlit-authenticator==0.2.2
+streamlit-authenticator==0.3.2
 bcrypt
+
