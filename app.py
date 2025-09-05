@@ -30,7 +30,12 @@ config = {
 }
 
 # --- Autenticación ---
-authenticator = stauth.Authenticate(config, 'mi_app_streamlit', 'cookie_firma_unica', 7)
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    'mi_app_streamlit',
+    'cookie_firma_unica',
+    7
+)
 name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
 if authentication_status:
