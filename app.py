@@ -111,7 +111,7 @@ if authentication_status:
                     ]}
                 ]
                 response = openai.chat.completions.create(
-                    model="gpt-5.1-chat-latest",
+                    model="gpt-5.1",
                     messages=messages,
                     max_tokens=2048,
                 )
@@ -191,3 +191,4 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
