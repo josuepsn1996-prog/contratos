@@ -1,11 +1,35 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 import base64
 import tempfile
-import fitz  # PyMuPDF
+import fitz
+import time
 
-# --- Configuración de usuarios y contraseñas ---
+
+# ===============================================================
+# FUNCIÓN DE REINTENTOS (ANTI RATE LIMIT)
+# ===============================================================
+
+def safe_gpt(client, model, input_data, max_output_tokens=2000, retries=5):
+    while retries > 0:
+        try:
+            return client.responses.create(
+                model=model,
+                input=input_data,
+                max_output_tokens=max_output_tokens
+            )
+        except RateLimitError as e:
+            wait = getattr(e, "retry_after", 3)
+            time.sleep(wait)
+            retries -= 1
+    raise Exception("Rate limit persistente. Reduce el tamaño del contrato.")
+
+
+# ===============================================================
+# CONFIGURACIÓN LOGIN
+# ===============================================================
+
 config = {
     'credentials': {
         'usernames': {
@@ -29,7 +53,7 @@ config = {
     }
 }
 
-# --- Autenticación ---
+
 authenticator = stauth.Authenticate(
     config['credentials'],
     'mi_app_streamlit',
@@ -39,77 +63,73 @@ authenticator = stauth.Authenticate(
 
 name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
+
+# ===============================================================
+# APP PRINCIPAL
+# ===============================================================
+
 if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
 
     st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
-    st.title("📄 Análisis Inteligente de Contratos de la Administración Pública")
-
-    st.markdown("""
-    Carga tu contrato público (PDF, escaneado o digital).  
-    La IA extrae y consolida los **elementos legales más importantes** del contrato.
-    """)
+    st.title("📄 Análisis Inteligente de Contratos Públicos (GPT-5)")
 
     api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
-    uploaded_file = st.file_uploader("Sube tu contrato en PDF", type=["pdf"])
+    archivo = st.file_uploader("Sube tu contrato en PDF", type=["pdf"])
 
-    if uploaded_file and api_key:
+    if archivo and api_key:
 
         client = OpenAI(api_key=api_key)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(uploaded_file.read())
+            tmp.write(archivo.read())
             tmp_path = tmp.name
 
         st.info("Detectando tipo de PDF...")
-
         doc = fitz.open(tmp_path)
-        is_digital = True
-        digital_texts = []
 
-        for page in doc:
-            page_text = page.get_text("text")
-            digital_texts.append(page_text)
-            if len(page_text.strip()) < 30:
+        # Detección de PDF digital vs imagen
+        is_digital = True
+        digital_pages = []
+
+        for p in doc:
+            t = p.get_text("text")
+            digital_pages.append(t)
+            if len(t.strip()) < 30:
                 is_digital = False
 
-        st.success(f"Tipo de PDF detectado: {'Digital (texto seleccionable)' if is_digital else 'Escaneado (imagen)'}")
+        st.success("Tipo: " + ("Digital (texto seleccionable)" if is_digital else "Escaneado / Imagen"))
 
         all_texts = []
-        progress_bar = st.progress(0)
+        progress = st.progress(0)
 
-        # ---------------------------------------
-        # OCR DIGITAL O IMAGEN
-        # ---------------------------------------
+
+        # ===========================================================
+        # 1) OCR — GPT-5.1 (máxima precisión de visión)
+        # ===========================================================
 
         if is_digital:
-            st.info("Extrayendo texto directamente...")
-            for i, page_text in enumerate(digital_texts):
-                all_texts.append(page_text)
-                progress_bar.progress((i + 1) / len(doc))
-
+            for i, t in enumerate(digital_pages):
+                all_texts.append(t)
+                progress.progress((i+1)/len(doc))
         else:
-            st.info("Realizando OCR con GPT-5.1...")
-
             for i, page in enumerate(doc):
+
                 pix = page.get_pixmap(dpi=300)
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
-                response = client.responses.create(
+                response = safe_gpt(
+                    client,
                     model="gpt-5.1",
-                    input=[
+                    input_data=[
                         {
                             "role": "user",
                             "content": [
                                 {
                                     "type": "input_text",
-                                    "text": (
-                                        "Extrae TODO el texto del contrato en la imagen. "
-                                        "Incluye partes, objeto, montos, plazos, garantías, penalizaciones, firmas, anexos, etc. "
-                                        "Devuelve solo texto limpio."
-                                    )
+                                    "text": "Realiza OCR completo del contrato. Devuelve solo texto plano."
                                 },
                                 {
                                     "type": "input_image",
@@ -118,66 +138,77 @@ if authentication_status:
                             ]
                         }
                     ],
-                    max_output_tokens=2048
+                    max_output_tokens=2000
                 )
 
                 texto = response.output_text
                 all_texts.append(texto)
-                progress_bar.progress((i + 1) / len(doc))
+                progress.progress((i+1)/len(doc))
 
-        st.success("¡Extracción completada!")
+
+        st.success("OCR completado")
 
         with st.expander("Ver texto extraído"):
             for idx, txt in enumerate(all_texts):
-                st.markdown(f"### Página {idx+1}\n{txt}\n---")
+                st.markdown(f"### Página {idx+1}\n\n{txt}\n\n---")
 
-        # ---------------------------------------
-        # CONSOLIDACIÓN LEGAL
-        # ---------------------------------------
+
+        # ===========================================================
+        # 2) ANÁLISIS LEGAL — GPT-5-mini (500,000 TPM)
+        # ===========================================================
 
         full_text = "\n\n".join(all_texts)
 
-        prompt_final = (
-            "Eres un analista legal experto en contratos públicos. "
-            "DEBES LLENAR ESTA TABLA, SIN CAMBIAR EL FORMATO, SIN OMITIR CAMPOS:\n\n"
-            "| Campo | Respuesta |\n"
-            "|-------|-----------|\n"
-            "| Partes | Por la Secretaría: [...]. Por el Proveedor: [...]. |\n"
-            "| Objeto | [...] |\n"
-            "| Monto antes de IVA | [...] |\n"
-            "| IVA | [...] |\n"
-            "| Monto total | [...] |\n"
-            "| Fecha de inicio | [...] |\n"
-            "| Fecha de fin | [...] |\n"
-            "| Vigencia/Plazo | [...] |\n"
-            "| Garantía(s) | [...] |\n"
-            "| Obligaciones proveedor | [...] |\n"
-            "| Supervisión | [...] |\n"
-            "| Penalizaciones | [...] |\n"
-            "| Penalización máxima | [...] |\n"
-            "| Modificaciones | [...] |\n"
-            "| Normatividad aplicable | [...] |\n"
-            "| Resolución de controversias | [...] |\n"
-            "| Firmas | [...] |\n"
-            "| Anexos | [...] |\n"
-            "| No localizado | [...] |\n"
-            "| Áreas de mejora | [...] |\n\n"
-            "Llena la tabla con información literal del contrato. Si algo no aparece, escribe 'NO LOCALIZADO'.\n\n"
-            f"Texto del contrato:\n{full_text}"
-        )
+        prompt_tabla = f"""
+Eres un analista legal experto en contratos públicos.
 
-        response_final = client.responses.create(
-            model="gpt-5.1",
-            input=[
+Llena esta TABLA EXACTA, sin cambiar el formato:
+
+| Campo | Respuesta |
+|-------|-----------|
+| Partes | [...] |
+| Objeto | [...] |
+| Monto antes de IVA | [...] |
+| IVA | [...] |
+| Monto total | [...] |
+| Fecha de inicio | [...] |
+| Fecha de fin | [...] |
+| Vigencia/Plazo | [...] |
+| Garantía(s) | [...] |
+| Obligaciones proveedor | [...] |
+| Supervisión | [...] |
+| Penalizaciones | [...] |
+| Penalización máxima | [...] |
+| Modificaciones | [...] |
+| Normatividad aplicable | [...] |
+| Resolución de controversias | [...] |
+| Firmas | [...] |
+| Anexos | [...] |
+| No localizado | [...] |
+| Áreas de mejora | [...] |
+
+Reglas:
+- Usa SOLO información literal del contrato.
+- Si un dato no aparece, escribe: **NO LOCALIZADO**.
+- No expliques nada fuera de la tabla.
+
+TEXTO COMPLETO DEL CONTRATO:
+{full_text}
+"""
+
+        response_final = safe_gpt(
+            client,
+            model="gpt-5-mini",              # 🌟 SIN RATE LIMIT
+            input_data=[
                 {"role": "system", "content": "Eres un experto legal en contratos públicos."},
-                {"role": "user", "content": prompt_final}
+                {"role": "user", "content": prompt_tabla}
             ],
-            max_output_tokens=4096
+            max_output_tokens=2500
         )
 
         resultado = response_final.output_text
 
-        st.success("¡Análisis general completado!")
+        st.success("¡Análisis completado!")
         st.markdown("### Ficha estandarizada del contrato:")
         st.markdown(resultado)
 
@@ -188,14 +219,9 @@ if authentication_status:
             mime="text/markdown"
         )
 
+
 elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 
 elif authentication_status is None:
-    st.info("Por favor ingresa tus credenciales")
-
-
-
-
-
-
+    st.info("Ingresa tus credenciales para comenzar.")
