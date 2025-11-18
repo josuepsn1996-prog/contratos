@@ -36,6 +36,7 @@ authenticator = stauth.Authenticate(
     'cookie_firma_unica',
     7
 )
+
 # SOLO argumentos posicionales, NUNCA nombrados:
 name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
 
@@ -110,7 +111,7 @@ if authentication_status:
                     ]}
                 ]
                 response = openai.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-5.1-chat-latest",
                     messages=messages,
                     max_tokens=2048,
                 )
@@ -164,7 +165,7 @@ if authentication_status:
         )
 
         response_final = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.1-chat-latest",
             messages=[
                 {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve solo la tabla, siguiendo exactamente el formato y campos indicados, sin texto extra, sin contexto ni interpretaciones."},
                 {"role": "user", "content": prompt_final}
@@ -190,6 +191,3 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
-
-
-
