@@ -69,8 +69,8 @@ if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
 
-    st.set_page_config(page_title="Análisis de Contratos Públicos (IA Rápida)", page_icon="📄")
-    st.title("📄 Análisis Inteligente de Contratos de Obra Pública (Optimizado)")
+    st.set_page_config(page_title="Análisis Inteligentes de Documetnos Institucionales", page_icon="📄")
+    st.title("📄Análisis Inteligentes de Documetnos Institucionales")
 
     api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
     archivo = st.file_uploader("Sube tu contrato PDF", type=["pdf"])
@@ -282,3 +282,4 @@ else:
         st.error("Usuario o contraseña incorrectos")
     else:
         st.info("Ingresa tus credenciales para comenzar.")
+
