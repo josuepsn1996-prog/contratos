@@ -11,7 +11,7 @@ import time
 # FUNCIÓN DE REINTENTOS (ANTI RATE LIMIT)
 # ===============================================================
 
-def safe_gpt(client, model, input_data, max_output_tokens=2000, retries=5):
+def safe_gpt(client, model, input_data, max_output_tokens=1500, retries=5):
     while retries > 0:
         try:
             return client.responses.create(
@@ -73,7 +73,7 @@ if authentication_status:
     authenticator.logout("Cerrar sesión", "sidebar")
 
     st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
-    st.title("📄 Análisis Inteligente de Contratos Públicos (GPT-5)")
+    st.title("📄 Análisis Inteligente de Contratos Públicos (GPT-5.1)")
 
     api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
     archivo = st.file_uploader("Sube tu contrato en PDF", type=["pdf"])
@@ -101,68 +101,106 @@ if authentication_status:
 
         st.success("Tipo: " + ("Digital (texto seleccionable)" if is_digital else "Escaneado / Imagen"))
 
-        all_texts = []
+        page_summaries = []
         progress = st.progress(0)
 
-
         # ===========================================================
-        # 1) OCR — GPT-5.1 (máxima precisión de visión)
+        # 1) OCR + RESUMEN POR PÁGINA — GPT-5.1
         # ===========================================================
 
-        if is_digital:
-            for i, t in enumerate(digital_pages):
-                all_texts.append(t)
-                progress.progress((i+1)/len(doc))
-        else:
-            for i, page in enumerate(doc):
+        st.info("Extrayendo y normalizando contenido página por página...")
 
+        for i, page in enumerate(doc if not is_digital else digital_pages):
+
+            if is_digital:
+                text = page
+                img_base64 = None
+            else:
                 pix = page.get_pixmap(dpi=300)
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
-                response = safe_gpt(
-                    client,
-                    model="gpt-5.1",
-                    input_data=[
+            # Prompt para extraer solo información útil
+            input_payload = [
+                {
+                    "role": "user",
+                    "content": [
                         {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "input_text",
-                                    "text": "Realiza OCR completo del contrato. Devuelve solo texto plano."
-                                },
-                                {
-                                    "type": "input_image",
-                                    "image": {"base64": img_base64}
-                                }
-                            ]
+                            "type": "input_text",
+                            "text": (
+                                "Extrae solo la información útil legal de esta página de contrato "
+                                "(partes, objeto, montos, plazos, obligaciones, garantías, firmas, penalizaciones, anexos). "
+                                "Devuelve texto ordenado. No inventes."
+                            )
                         }
-                    ],
-                    max_output_tokens=2000
-                )
+                    ]
+                }
+            ]
 
-                texto = response.output_text
-                all_texts.append(texto)
-                progress.progress((i+1)/len(doc))
+            if img_base64:
+                input_payload[0]["content"].append({
+                    "type": "input_image",
+                    "image": {"base64": img_base64}
+                })
+            else:
+                input_payload[0]["content"].append({
+                    "type": "input_text",
+                    "text": text
+                })
 
+            r = safe_gpt(
+                client,
+                model="gpt-5.1",
+                input_data=input_payload,
+                max_output_tokens=1200
+            )
 
-        st.success("OCR completado")
+            resumen = r.output_text
+            page_summaries.append(resumen)
 
-        with st.expander("Ver texto extraído"):
-            for idx, txt in enumerate(all_texts):
-                st.markdown(f"### Página {idx+1}\n\n{txt}\n\n---")
+            progress.progress((i + 1) / len(doc))
+
+        st.success("Texto consolidado por página generado.")
 
 
         # ===========================================================
-        # 2) ANÁLISIS LEGAL — GPT-5-mini (500,000 TPM)
+        # 2) CONSOLIDACIÓN GLOBAL — GPT-5.1
         # ===========================================================
 
-        full_text = "\n\n".join(all_texts)
+        st.info("Creando resumen legal consolidado...")
 
-        prompt_tabla = f"""
+        texto_reducido = "\n\n".join(page_summaries)
+
+        consolidacion_prompt = f"""
 Eres un analista legal experto en contratos públicos.
+Consolida toda esta información legal en una sola versión limpia:
 
-Llena esta TABLA EXACTA, sin cambiar el formato:
+{texto_reducido}
+
+Devuelve el texto consolidado, sin tabla todavía.
+"""
+
+        r_consolidado = safe_gpt(
+            client,
+            model="gpt-5.1",
+            input_data=[{"role": "user", "content": consolidacion_prompt}],
+            max_output_tokens=2000
+        )
+
+        resumen_final = r_consolidado.output_text
+
+
+        # ===========================================================
+        # 3) TABLA FINAL — GPT-5.1 (FORMATO SIEMPRE ESTABLE)
+        # ===========================================================
+
+        tabla_prompt = f"""
+Usa la siguiente información consolidada de un contrato público para llenar ESTA TABLA EXACTA:
+
+INFORMACIÓN:
+{resumen_final}
+
+TABLA A LLENAR (NO CAMBIES NADA):
 
 | Campo | Respuesta |
 |-------|-----------|
@@ -187,41 +225,27 @@ Llena esta TABLA EXACTA, sin cambiar el formato:
 | No localizado | [...] |
 | Áreas de mejora | [...] |
 
-Reglas:
-- Usa SOLO información literal del contrato.
-- Si un dato no aparece, escribe: **NO LOCALIZADO**.
-- No expliques nada fuera de la tabla.
-
-TEXTO COMPLETO DEL CONTRATO:
-{full_text}
+REGLAS:
+- Usa SOLO información literal encontrada.
+- Si falta un dato, usa "NO LOCALIZADO".
+- No agregues texto fuera de la tabla.
 """
 
-        response_final = safe_gpt(
+        r_tabla = safe_gpt(
             client,
-            model="gpt-5-mini",              # 🌟 SIN RATE LIMIT
-            input_data=[
-                {"role": "system", "content": "Eres un experto legal en contratos públicos."},
-                {"role": "user", "content": prompt_tabla}
-            ],
+            model="gpt-5.1",
+            input_data=[{"role": "user", "content": tabla_prompt}],
             max_output_tokens=2500
         )
 
-        resultado = response_final.output_text
+        tabla = r_tabla.output_text
 
         st.success("¡Análisis completado!")
         st.markdown("### Ficha estandarizada del contrato:")
-        st.markdown(resultado)
+        st.markdown(tabla)
 
-        st.download_button(
-            "Descargar ficha (Markdown)",
-            data=resultado,
-            file_name="ficha_contrato_publico.md",
-            mime="text/markdown"
-        )
-
-
-elif authentication_status is False:
-    st.error("Usuario o contraseña incorrectos")
-
-elif authentication_status is None:
-    st.info("Ingresa tus credenciales para comenzar.")
+else:
+    if authentication_status is False:
+        st.error("Usuario o contraseña incorrectos")
+    else:
+        st.info("Ingresa tus credenciales par
