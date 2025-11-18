@@ -248,4 +248,5 @@ else:
     if authentication_status is False:
         st.error("Usuario o contraseña incorrectos")
     else:
-        st.info("Ingresa tus credenciales par
+        st.info("Ingresa tus credenciales para comenzar.")
+
