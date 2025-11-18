@@ -112,7 +112,7 @@ if authentication_status:
                 response = openai.chat.completions.create(
                     model="gpt-4o",
                     messages=messages,
-                    max_tokens=2048,
+                    max_completion_tokens=2048,
                 )
                 page_text = response.choices[0].message.content
                 all_texts.append(page_text)
@@ -169,7 +169,7 @@ if authentication_status:
                 {"role": "system", "content": "Eres un experto en contratos públicos. Devuelve solo la tabla, siguiendo exactamente el formato y campos indicados, sin texto extra, sin contexto ni interpretaciones."},
                 {"role": "user", "content": prompt_final}
             ],
-            max_tokens=4096,
+            max_completion_tokens=2048,
         )
         resultado = response_final.choices[0].message.content
 
@@ -190,6 +190,7 @@ elif authentication_status is False:
     st.error("Usuario o contraseña incorrectos")
 elif authentication_status is None:
     st.info("Por favor ingresa tus credenciales")
+
 
 
 
