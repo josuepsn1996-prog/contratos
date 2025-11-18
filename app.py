@@ -5,17 +5,13 @@ import base64
 import tempfile
 import fitz
 import time
-
+import re
 
 # ===============================================================
-# FUNCIÓN DE REINTENTOS (ANTI RATE LIMIT)
+# FUNCIÓN DE REINTENTOS ANTI RATE LIMIT
 # ===============================================================
 
-def safe_gpt(client, model, input_data, max_output_tokens=1500, retries=5):
-    """
-    Wrapper para llamar a OpenAI Responses con reintentos automáticos
-    ante errores de rate limit.
-    """
+def safe_gpt(client, model, input_data, max_output_tokens=4000, retries=5):
     while retries > 0:
         try:
             return client.responses.create(
@@ -27,11 +23,11 @@ def safe_gpt(client, model, input_data, max_output_tokens=1500, retries=5):
             wait = getattr(e, "retry_after", 3)
             time.sleep(wait)
             retries -= 1
-    raise Exception("Rate limit persistente. Reduce el tamaño del contrato.")
 
+    raise Exception("Rate limit persistente. Intenta de nuevo más tarde.")
 
 # ===============================================================
-# CONFIGURACIÓN LOGIN
+# CONFIGURACIÓN LOGIN STREAMLIT
 # ===============================================================
 
 config = {
@@ -52,9 +48,7 @@ config = {
         'key': 'cookie_firma_unica',
         'name': 'mi_app_streamlit'
     },
-    'preauthorized': {
-        'emails': []
-    }
+    'preauthorized': {'emails': []}
 }
 
 authenticator = stauth.Authenticate(
@@ -64,134 +58,64 @@ authenticator = stauth.Authenticate(
     7
 )
 
-name, authentication_status, username = authenticator.login('Iniciar sesión', 'main')
-
+name, authentication_status, username = authenticator.login("Iniciar sesión", "main")
 
 # ===============================================================
 # APP PRINCIPAL
 # ===============================================================
 
 if authentication_status:
+
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
 
-    st.set_page_config(page_title="IA Contratos Públicos OCR", page_icon="📄")
-    st.title("📄 Análisis Inteligente de Contratos Públicos (GPT-5.1)")
+    st.set_page_config(page_title="Análisis de Contratos Públicos (IA Rápida)", page_icon="📄")
+    st.title("📄 Análisis Inteligente de Contratos de Obra Pública (Optimizado)")
 
     api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
-    archivo = st.file_uploader("Sube tu contrato en PDF", type=["pdf"])
+    archivo = st.file_uploader("Sube tu contrato PDF", type=["pdf"])
 
     if archivo and api_key:
 
         client = OpenAI(api_key=api_key)
 
-        # Guardar PDF temporalmente
+        # Guardar archivo temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp.write(archivo.read())
             tmp_path = tmp.name
 
-        st.info("Detectando tipo de PDF...")
+        st.info("Extrayendo texto del PDF...")
+
+        # ===============================================================
+        # 1) EXTRAER TEXTO LOCALMENTE (PyMuPDF)
+        # ===============================================================
+
         doc = fitz.open(tmp_path)
+        full_text = ""
 
-        # Detección de PDF digital vs imagen
-        is_digital = True
-        digital_pages = []
+        for page in doc:
+            page_text = page.get_text("text")
+            full_text += page_text + "\n\n"
 
-        for p in doc:
-            t = p.get_text("text")
-            digital_pages.append(t)
-            if len(t.strip()) < 30:
-                is_digital = False
+        # ===============================================================
+        # 2) LIMPIEZA LOCAL DEL TEXTO (corrige saltos, OCR pobre, etc.)
+        # ===============================================================
 
-        st.success("Tipo: " + ("Digital (texto seleccionable)" if is_digital else "Escaneado / Imagen"))
+        def limpiar_texto(t):
+            t = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", t)      # unir palabras cortadas
+            t = re.sub(r"\n(?!\n)", " ", t)                     # unir líneas
+            t = re.sub(r"\s{2,}", " ", t)                       # eliminar espacios dobles
+            t = t.replace("�", "").replace("●", "").replace("•", "")
+            return t.strip()
 
-        page_texts = []
-        progress = st.progress(0)
+        texto_limpio = limpiar_texto(full_text)
 
-        # ===========================================================
-        # 1) EXTRACCIÓN POR PÁGINA — GPT-5.1 (sin resumen)
-        # ===========================================================
+        with st.expander("Mostrar texto extraído (debug)", expanded=False):
+            st.text_area("Texto limpio:", texto_limpio, height=300)
 
-        st.info("Extrayendo contenido página por página...")
-
-        for i, page in enumerate(doc if not is_digital else digital_pages):
-
-            if is_digital:
-                text = page
-                img_base64 = None
-            else:
-                pix = page.get_pixmap(dpi=300)
-                img_bytes = pix.tobytes("png")
-                img_base64 = base64.b64encode(img_bytes).decode("utf-8")
-
-            # Prompt para extraer texto literal de la página
-            input_payload = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": (
-                                "Eres un extractor jurídico experto. "
-                                "Devuelve SOLO el texto de esta página del contrato. "
-                                "NO resumas. "
-                                "NO interpretes. "
-                                "NO reescribas. "
-                                "NO corrijas ortografía. "
-                                "NO comentes nada. "
-                                "NO inventes. "
-                                "Devuelve el texto tal cual, pero en un solo bloque continuo, "
-                                "uniendo palabras cortadas por saltos de línea cuando sea obvio. "
-                                "No elimines montos, no elimines fechas, no elimines porcentajes."
-                            )
-                        }
-                    ]
-                }
-            ]
-
-            if img_base64:
-                input_payload[0]["content"].append({
-                    "type": "input_image",
-                    "image": {"base64": img_base64}
-                })
-            else:
-                input_payload[0]["content"].append({
-                    "type": "input_text",
-                    "text": text
-                })
-
-            r = safe_gpt(
-                client,
-                model="gpt-5.1",
-                input_data=input_payload,
-                max_output_tokens=4000
-            )
-
-            texto_pagina = r.output_text
-            page_texts.append(texto_pagina)
-
-            progress.progress((i + 1) / len(doc))
-
-        st.success("Texto extraído página por página.")
-
-        # ===========================================================
-        # 2) TEXTO CONTRACTUAL UNIFICADO (SIN GPT)
-        # ===========================================================
-
-        st.info("Uniendo texto de todas las páginas...")
-
-        # Aquí ya NO usamos GPT para consolidar, solo concatenamos en Python
-        texto_contrato_completo = "\n\n".join(page_texts)
-
-        # Puedes mostrarlo en un expander para debug:
-        with st.expander("Ver texto completo extraído (debug)", expanded=False):
-            st.text_area("Texto consolidado", value=texto_contrato_completo, height=300)
-
-        # ===========================================================
-        # 3) TABLA FINAL — GPT-5.1 (EXTRACCIÓN ESTRICTA CAMPO POR CAMPO)
-        # ===========================================================
-
-        st.info("Generando ficha estandarizada del contrato...")
+        # ===============================================================
+        # 3) PROMPT EXACTO QUE PROPORCIONASTE (SIN CAMBIAR NADA)
+        # ===============================================================
 
         tabla_prompt = f"""
 Eres un perito jurídico experto en contratos de obra pública y adquisiciones del gobierno.
@@ -324,25 +248,34 @@ REGLAS ESPECÍFICAS POR CAMPO:
    - Si no detectas nada relevante, escribe: NO LOCALIZADO.
 
 TEXTO COMPLETO DEL CONTRATO:
-{texto_contrato_completo}
+{texto_limpio}
 
 RECUERDA:
 - Devuelve ÚNICAMENTE la tabla Markdown.
 - No incluyas explicaciones, notas ni texto adicional.
 """
 
-        r_tabla = safe_gpt(
+        # ===============================================================
+        # 4) UNA SOLA LLAMADA GPT-5.1
+        # ===============================================================
+
+        respuesta = safe_gpt(
             client,
             model="gpt-5.1",
             input_data=[{"role": "user", "content": tabla_prompt}],
-            max_output_tokens=4000
+            max_output_tokens=3500
         )
 
-        tabla = r_tabla.output_text
+        tabla = respuesta.output_text
+
+        # ===============================================================
+        # 5) MOSTRAR RESULTADO
+        # ===============================================================
 
         st.success("¡Análisis completado!")
         st.markdown("### Ficha estandarizada del contrato:")
         st.markdown(tabla)
+
 
 else:
     if authentication_status is False:
