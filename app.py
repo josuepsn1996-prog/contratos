@@ -12,6 +12,10 @@ import time
 # ===============================================================
 
 def safe_gpt(client, model, input_data, max_output_tokens=1500, retries=5):
+    """
+    Wrapper para llamar a OpenAI Responses con reintentos automáticos
+    ante errores de rate limit.
+    """
     while retries > 0:
         try:
             return client.responses.create(
@@ -81,6 +85,7 @@ if authentication_status:
 
         client = OpenAI(api_key=api_key)
 
+        # Guardar PDF temporalmente
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp.write(archivo.read())
             tmp_path = tmp.name
@@ -100,14 +105,14 @@ if authentication_status:
 
         st.success("Tipo: " + ("Digital (texto seleccionable)" if is_digital else "Escaneado / Imagen"))
 
-        page_summaries = []
+        page_texts = []
         progress = st.progress(0)
 
         # ===========================================================
-        # 1) OCR + EXTRACCIÓN POR PÁGINA — GPT-5.1
+        # 1) EXTRACCIÓN POR PÁGINA — GPT-5.1 (sin resumen)
         # ===========================================================
 
-        st.info("Extrayendo y normalizando contenido página por página...")
+        st.info("Extrayendo contenido página por página...")
 
         for i, page in enumerate(doc if not is_digital else digital_pages):
 
@@ -119,7 +124,7 @@ if authentication_status:
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
-            # NUEVO PROMPT ULTRA ESTRICTO
+            # Prompt para extraer texto literal de la página
             input_payload = [
                 {
                     "role": "user",
@@ -128,21 +133,16 @@ if authentication_status:
                             "type": "input_text",
                             "text": (
                                 "Eres un extractor jurídico experto. "
-                                "Devuelve SOLO el texto limpio de esta página del contrato. "
+                                "Devuelve SOLO el texto de esta página del contrato. "
                                 "NO resumas. "
                                 "NO interpretes. "
                                 "NO reescribas. "
-                                "NO corrijas. "
-                                "NO expliques. "
+                                "NO corrijas ortografía. "
+                                "NO comentes nada. "
                                 "NO inventes. "
-                                "Devuelve el texto EXACTO tal como aparece, pero en un bloque continuo "
-                                "sin saltos de línea innecesarios. "
-                                "No elimines montos. "
-                                "No elimines fechas. "
-                                "No elimines porcentajes. "
-                                "No elimines palabras aunque estén cortadas. "
-                                "No agregues títulos. "
-                                "Solo extrae literalmente."
+                                "Devuelve el texto tal cual, pero en un solo bloque continuo, "
+                                "uniendo palabras cortadas por saltos de línea cuando sea obvio. "
+                                "No elimines montos, no elimines fechas, no elimines porcentajes."
                             )
                         }
                     ]
@@ -164,100 +164,171 @@ if authentication_status:
                 client,
                 model="gpt-5.1",
                 input_data=input_payload,
-                max_output_tokens=3000
+                max_output_tokens=4000
             )
 
-            resumen = r.output_text
-            page_summaries.append(resumen)
+            texto_pagina = r.output_text
+            page_texts.append(texto_pagina)
 
             progress.progress((i + 1) / len(doc))
 
-        st.success("Texto consolidado por página generado.")
-
-
-        # ===========================================================
-        # 2) CONSOLIDACIÓN GLOBAL — GPT-5.1
-        # ===========================================================
-
-        st.info("Creando texto contractual unificado...")
-
-        texto_reducido = "\n\n".join(page_summaries)
-
-        consolidacion_prompt = f"""
-Eres un analista jurídico. Une absolutamente TODO el texto proporcionado.
-
-NO resumas.
-NO elimines texto.
-NO reescribas.
-NO reformules.
-NO interpretes.
-NO sustituyas palabras.
-NO cambies comas, números, fechas, montos ni porcentajes.
-
-Solo fusiona el contenido para producir un texto único y corrido.
-
-TEXTO COMPLETO:
-{texto_reducido}
-"""
-
-        r_consolidado = safe_gpt(
-            client,
-            model="gpt-5.1",
-            input_data=[{"role": "user", "content": consolidacion_prompt}],
-            max_output_tokens=6000
-        )
-
-        resumen_final = r_consolidado.output_text
-
+        st.success("Texto extraído página por página.")
 
         # ===========================================================
-        # 3) TABLA FINAL EXACTA (NUEVO PROMPT COMPLETO)
+        # 2) TEXTO CONTRACTUAL UNIFICADO (SIN GPT)
         # ===========================================================
+
+        st.info("Uniendo texto de todas las páginas...")
+
+        # Aquí ya NO usamos GPT para consolidar, solo concatenamos en Python
+        texto_contrato_completo = "\n\n".join(page_texts)
+
+        # Puedes mostrarlo en un expander para debug:
+        with st.expander("Ver texto completo extraído (debug)", expanded=False):
+            st.text_area("Texto consolidado", value=texto_contrato_completo, height=300)
+
+        # ===========================================================
+        # 3) TABLA FINAL — GPT-5.1 (EXTRACCIÓN ESTRICTA CAMPO POR CAMPO)
+        # ===========================================================
+
+        st.info("Generando ficha estandarizada del contrato...")
 
         tabla_prompt = f"""
-Eres un perito jurídico en contratos públicos. Tienes el texto COMPLETO del contrato. 
-Tu tarea es llenar ESTA TABLA EXACTA con los valores LITERALES encontrados en el documento.
+Eres un perito jurídico experto en contratos de obra pública y adquisiciones del gobierno.
 
-MUY IMPORTANTE:
-- NO inventes.
-- NO sustituyas.
-- NO interpretes.
-- NO complementes.
-- NO resumas.
-- NO suprimas datos.
-- Usa SOLO texto literal del contrato.
-- Si un dato no aparece EXACTAMENTE, escribe “NO LOCALIZADO”.
-- La tabla debe salir EXACTAMENTE como está: mismo orden, mismas columnas, sin texto adicional.
-
-TEXTO COMPLETO DEL CONTRATO:
-{resumen_final}
-
-LLENA LA SIGUIENTE TABLA EXACTA, CON LAS RESPUESTAS EXACTAS QUE SE HAN IDENTIFICADO:
+Tienes el texto COMPLETO de un contrato de obra pública. Debes llenar UNA TABLA en formato Markdown
+con dos columnas: "Campo" y "Respuesta", siguiendo EXACTAMENTE esta estructura:
 
 | Campo | Respuesta |
 |-------|-----------|
-| Partes | Secretaría de Comunicaciones y Obras Públicas del Estado de Durango (“LA DEPENDENCIA”) y ARAM ALTA INGENIERÍA S.A. DE C.V. (“EL CONTRATISTA”). |
-| Objeto | Construcción de acceso a la localidad de Fray Francisco Montes de Oca a base de carpeta asfáltica en Durango, con trabajos de preliminares, terracerías, pavimentos, estructuras, señalamientos y dispositivos de seguridad. |
-| Monto antes de IVA | $3'436,646.48 |
-| IVA | NO LOCALIZADO |
-| Monto total | NO LOCALIZADO |
-| Fecha de inicio | 28 de octubre de 2024 |
-| Fecha de fin | 10 de enero de 2025 |
-| Vigencia/Plazo | 75 días naturales |
-| Garantía(s) | Garantía de cumplimiento del 10% del monto total del contrato + IVA; Garantía de anticipo mediante fianza del 50% del monto total del contrato incluyendo IVA. |
-| Obligaciones proveedor | Ejecutar la obra conforme a normas, especificaciones, planos y programa; garantizar calidad; cumplir Ley de Obra Pública; no emplear menores; mantener seguros a trabajadores; responder por vicios ocultos; cumplir tiempos; permitir supervisión. |
-| Supervisión | Realizada por el Residente de Obra designado por “LA DEPENDENCIA”. |
-| Penalizaciones | Retención del 3% de los trabajos no ejecutados en tiempo. |
-| Penalización máxima | Hasta el límite de la garantía de cumplimiento. |
-| Modificaciones | Permitidas hasta el 25% del monto o plazo conforme al artículo 72 LOPSRMEM. |
-| Normatividad aplicable | LOPSRMEM; Constitución Art. 134; Reglamento Interior de SECOPE. |
-| Resolución de controversias | NO LOCALIZADO |
-| Firmas | Arq. Ana Rosa Hernández Rentería por “LA DEPENDENCIA”; C.P. Guillermo Fernando Flores Gómez por “EL CONTRATISTA”. |
-| Anexos | Proyecto; Catálogo de conceptos; Programa general de ejecución. |
-| No localizado | Coloca aquí cualquier información relevante NO encontrada. |
-| Áreas de mejora | Identifica campos poco claros o riesgos contractuales. |
+| Partes | ... |
+| Objeto | ... |
+| Monto antes de IVA | ... |
+| IVA | ... |
+| Monto total | ... |
+| Fecha de inicio | ... |
+| Fecha de fin | ... |
+| Vigencia/Plazo | ... |
+| Garantía(s) | ... |
+| Obligaciones proveedor | ... |
+| Supervisión | ... |
+| Penalizaciones | ... |
+| Penalización máxima | ... |
+| Modificaciones | ... |
+| Normatividad aplicable | ... |
+| Resolución de controversias | ... |
+| Firmas | ... |
+| Anexos | ... |
+| No localizado | ... |
+| Áreas de mejora | ... |
 
-NO AGREGUES NADA ANTES O DESPUÉS DE LA TABLA.
+REGLAS GENERALES:
+- Usa SOLO información que esté en el texto del contrato.
+- NO inventes nada.
+- Si un dato NO aparece claramente en el texto, escribe exactamente: NO LOCALIZADO.
+- NO agregues texto antes ni después de la tabla.
+- Usa SIEMPRE la sintaxis de tabla Markdown (con | y la fila de separación ---).
+
+REGLAS ESPECÍFICAS POR CAMPO:
+
+1) Partes:
+   - Identifica a la dependencia o entidad pública y a la empresa contratista.
+   - Devuelve una sola oración, por ejemplo:
+     Secretaría de Comunicaciones y Obras Públicas del Estado de Durango (“LA DEPENDENCIA”) y ARAM ALTA INGENIERÍA S.A. DE C.V. (“EL CONTRATISTA”).
+
+2) Objeto:
+   - Localiza la cláusula “OBJETO DEL CONTRATO” o similar.
+   - Devuelve una frase que describa la obra, limpia, en una sola oración.
+   - Ejemplo de estilo:
+     Construcción de acceso a la localidad de Fray Francisco Montes de Oca a base de carpeta asfáltica en el municipio de Durango, con trabajos de preliminares, terracerías, pavimentos, estructuras, señalamientos y dispositivos de seguridad.
+
+3) Monto antes de IVA:
+   - Busca el párrafo donde se indique algo como: “El monto total del presente contrato es la cantidad de $ X ... Más el impuesto al valor agregado”.
+   - Devuelve SOLO la cantidad numérica con signo de pesos, tal como aparece en el contrato.
+   - Por ejemplo: $3'436,646.48
+   - NO incluyas el texto en letras, solo el número.
+
+4) IVA:
+   - Si dice literalmente “Más el impuesto al valor agregado”, devuelve exactamente esa frase.
+   - Si se especifica un porcentaje de IVA, escríbelo.
+   - Si no se menciona el IVA, escribe: NO LOCALIZADO.
+
+5) Monto total:
+   - SOLO llena este campo si el contrato indica explícitamente el monto total con IVA desglosado.
+   - Si NO aparece expresado el monto total ya con IVA, escribe: NO LOCALIZADO.
+
+6) Fecha de inicio:
+   - Busca en la cláusula de plazo algo como: “El inicio de la ejecución de los trabajos será el día XX de mes de AAAA”.
+   - Devuelve SOLO la fecha en formato texto, por ejemplo: 28 de octubre de 2024.
+   - NO incluyas frases como “El inicio de la ejecución será el día...”, solo la fecha.
+
+7) Fecha de fin:
+   - Igual que la anterior, pero con la frase “se concluirá a más tardar el día...”.
+   - Devuelve SOLO la fecha, por ejemplo: 10 de enero de 2025.
+
+8) Vigencia/Plazo:
+   - Devuelve SOLO el plazo en forma compacta, por ejemplo: 75 días naturales.
+
+9) Garantía(s):
+   - Busca las cláusulas de “Garantía de Cumplimiento”, “Garantía de Anticipo” y “Vicios Ocultos”.
+   - Resume en UNA ORACIÓN clara los tipos de garantía y sus porcentajes.
+   - Ejemplo de estilo (sólo como referencia de forma, no lo copies si no aplica):
+     Garantía de cumplimiento del 10% del monto total del contrato más IVA y garantía de anticipo mediante fianza del 50% del monto total del contrato incluyendo IVA.
+
+10) Obligaciones proveedor:
+   - Identifica las obligaciones principales de “EL CONTRATISTA”: ejecutar la obra conforme a proyectos y especificaciones, calidad, plazos, cumplimiento de leyes laborales y fiscales, no emplear menores, responder por vicios ocultos, etc.
+   - Devuelve una sola oración que las resuma.
+
+11) Supervisión:
+   - Localiza la referencia al Residente de Obra o figura encargada de revisar y autorizar estimaciones y trabajos.
+   - Devuelve una frase del tipo:
+     La supervisión y autorización de los trabajos y estimaciones está a cargo del Residente de Obra designado por la dependencia.
+
+12) Penalizaciones:
+   - Busca la cláusula de “RETENCIONES Y PENAS CONVENCIONALES” o similar.
+   - Extrae las penalizaciones principales, por ejemplo el 3% de trabajos no ejecutados en tiempo.
+   - Devuelve una oración breve mencionando porcentaje y condición.
+
+13) Penalización máxima:
+   - Si el contrato indica que las penas no pueden exceder cierto límite (por ejemplo, el monto de la garantía de cumplimiento), escríbelo.
+   - Si no se menciona límite máximo, escribe: NO LOCALIZADO.
+
+14) Modificaciones:
+   - Busca la cláusula de modificaciones al contrato (referencias al artículo 72 de la LOPSRMEM, 25% del monto o plazo, etc.).
+   - Devuelve una oración clara del tipo:
+     Modificaciones permitidas hasta el 25% del monto o plazo, conforme al artículo 72 de la LOPSRMEM, sin cambiar la naturaleza del objeto.
+
+15) Normatividad aplicable:
+   - Enumera las principales normas citadas: Constitución, LOPSRMEM, Reglamento Interior, etc.
+   - Escríbelas separadas por punto y coma en una sola línea.
+
+16) Resolución de controversias:
+   - Si el contrato menciona mecanismos específicos (tribunales, sede, ley aplicable), descríbelos brevemente.
+   - Si no se menciona nada, escribe: NO LOCALIZADO.
+
+17) Firmas:
+   - Identifica quién firma por la dependencia y quién firma por el contratista.
+   - Devuelve una sola frase mencionando ambos nombres y cargos.
+   - Si no está claramente en el texto proporcionado, escribe: NO LOCALIZADO.
+
+18) Anexos:
+   - Enumera los anexos que el contrato menciona expresamente (proyecto, catálogo de conceptos, programa de ejecución, etc.).
+   - Escríbelos en una sola línea.
+
+19) No localizado:
+   - En este campo, enumera TODOS los campos de la tabla que hayan quedado como “NO LOCALIZADO”.
+   - Si todos los campos fueron localizados, escribe: Ninguno.
+
+20) Áreas de mejora:
+   - Señala en una o dos frases aspectos del contrato que podrían estar poco claros, ser riesgosos o susceptibles de controversia (por ejemplo: falta de monto total con IVA, falta de detalle en penalizaciones, etc.).
+   - Si no detectas nada relevante, escribe: NO LOCALIZADO.
+
+TEXTO COMPLETO DEL CONTRATO:
+{texto_contrato_completo}
+
+RECUERDA:
+- Devuelve ÚNICAMENTE la tabla Markdown.
+- No incluyas explicaciones, notas ni texto adicional.
 """
 
         r_tabla = safe_gpt(
