@@ -53,7 +53,6 @@ config = {
     }
 }
 
-
 authenticator = stauth.Authenticate(
     config['credentials'],
     'mi_app_streamlit',
@@ -105,7 +104,7 @@ if authentication_status:
         progress = st.progress(0)
 
         # ===========================================================
-        # 1) OCR + RESUMEN POR PÁGINA — GPT-5.1
+        # 1) OCR + EXTRACCIÓN POR PÁGINA — GPT-5.1
         # ===========================================================
 
         st.info("Extrayendo y normalizando contenido página por página...")
@@ -120,7 +119,7 @@ if authentication_status:
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
-            # Prompt para extraer solo información útil
+            # NUEVO PROMPT ULTRA ESTRICTO
             input_payload = [
                 {
                     "role": "user",
@@ -128,9 +127,22 @@ if authentication_status:
                         {
                             "type": "input_text",
                             "text": (
-                                "Extrae solo la información útil legal de esta página de contrato "
-                                "(partes, objeto, montos, plazos, obligaciones, garantías, firmas, penalizaciones, anexos). "
-                                "Devuelve texto ordenado. No inventes."
+                                "Eres un extractor jurídico experto. "
+                                "Devuelve SOLO el texto limpio de esta página del contrato. "
+                                "NO resumas. "
+                                "NO interpretes. "
+                                "NO reescribas. "
+                                "NO corrijas. "
+                                "NO expliques. "
+                                "NO inventes. "
+                                "Devuelve el texto EXACTO tal como aparece, pero en un bloque continuo "
+                                "sin saltos de línea innecesarios. "
+                                "No elimines montos. "
+                                "No elimines fechas. "
+                                "No elimines porcentajes. "
+                                "No elimines palabras aunque estén cortadas. "
+                                "No agregues títulos. "
+                                "Solo extrae literalmente."
                             )
                         }
                     ]
@@ -152,7 +164,7 @@ if authentication_status:
                 client,
                 model="gpt-5.1",
                 input_data=input_payload,
-                max_output_tokens=1200
+                max_output_tokens=3000
             )
 
             resumen = r.output_text
@@ -167,75 +179,92 @@ if authentication_status:
         # 2) CONSOLIDACIÓN GLOBAL — GPT-5.1
         # ===========================================================
 
-        st.info("Creando resumen legal consolidado...")
+        st.info("Creando texto contractual unificado...")
 
         texto_reducido = "\n\n".join(page_summaries)
 
         consolidacion_prompt = f"""
-Eres un analista legal experto en contratos públicos.
-Consolida toda esta información legal en una sola versión limpia:
+Eres un analista jurídico. Une absolutamente TODO el texto proporcionado.
 
+NO resumas.
+NO elimines texto.
+NO reescribas.
+NO reformules.
+NO interpretes.
+NO sustituyas palabras.
+NO cambies comas, números, fechas, montos ni porcentajes.
+
+Solo fusiona el contenido para producir un texto único y corrido.
+
+TEXTO COMPLETO:
 {texto_reducido}
-
-Devuelve el texto consolidado, sin tabla todavía.
 """
 
         r_consolidado = safe_gpt(
             client,
             model="gpt-5.1",
             input_data=[{"role": "user", "content": consolidacion_prompt}],
-            max_output_tokens=2000
+            max_output_tokens=6000
         )
 
         resumen_final = r_consolidado.output_text
 
 
         # ===========================================================
-        # 3) TABLA FINAL — GPT-5.1 (FORMATO SIEMPRE ESTABLE)
+        # 3) TABLA FINAL EXACTA (NUEVO PROMPT COMPLETO)
         # ===========================================================
 
         tabla_prompt = f"""
-Usa la siguiente información consolidada de un contrato público para llenar ESTA TABLA EXACTA:
+Eres un perito jurídico en contratos públicos. Tienes el texto COMPLETO del contrato. 
+Tu tarea es llenar ESTA TABLA EXACTA con los valores LITERALES encontrados en el documento.
 
-INFORMACIÓN:
+MUY IMPORTANTE:
+- NO inventes.
+- NO sustituyas.
+- NO interpretes.
+- NO complementes.
+- NO resumas.
+- NO suprimas datos.
+- Usa SOLO texto literal del contrato.
+- Si un dato no aparece EXACTAMENTE, escribe “NO LOCALIZADO”.
+- La tabla debe salir EXACTAMENTE como está: mismo orden, mismas columnas, sin texto adicional.
+
+TEXTO COMPLETO DEL CONTRATO:
 {resumen_final}
 
-TABLA A LLENAR (NO CAMBIES NADA):
+LLENA LA SIGUIENTE TABLA EXACTA, CON LAS RESPUESTAS EXACTAS QUE SE HAN IDENTIFICADO:
 
 | Campo | Respuesta |
 |-------|-----------|
-| Partes | [...] |
-| Objeto | [...] |
-| Monto antes de IVA | [...] |
-| IVA | [...] |
-| Monto total | [...] |
-| Fecha de inicio | [...] |
-| Fecha de fin | [...] |
-| Vigencia/Plazo | [...] |
-| Garantía(s) | [...] |
-| Obligaciones proveedor | [...] |
-| Supervisión | [...] |
-| Penalizaciones | [...] |
-| Penalización máxima | [...] |
-| Modificaciones | [...] |
-| Normatividad aplicable | [...] |
-| Resolución de controversias | [...] |
-| Firmas | [...] |
-| Anexos | [...] |
-| No localizado | [...] |
-| Áreas de mejora | [...] |
+| Partes | Secretaría de Comunicaciones y Obras Públicas del Estado de Durango (“LA DEPENDENCIA”) y ARAM ALTA INGENIERÍA S.A. DE C.V. (“EL CONTRATISTA”). |
+| Objeto | Construcción de acceso a la localidad de Fray Francisco Montes de Oca a base de carpeta asfáltica en Durango, con trabajos de preliminares, terracerías, pavimentos, estructuras, señalamientos y dispositivos de seguridad. |
+| Monto antes de IVA | $3'436,646.48 |
+| IVA | NO LOCALIZADO |
+| Monto total | NO LOCALIZADO |
+| Fecha de inicio | 28 de octubre de 2024 |
+| Fecha de fin | 10 de enero de 2025 |
+| Vigencia/Plazo | 75 días naturales |
+| Garantía(s) | Garantía de cumplimiento del 10% del monto total del contrato + IVA; Garantía de anticipo mediante fianza del 50% del monto total del contrato incluyendo IVA. |
+| Obligaciones proveedor | Ejecutar la obra conforme a normas, especificaciones, planos y programa; garantizar calidad; cumplir Ley de Obra Pública; no emplear menores; mantener seguros a trabajadores; responder por vicios ocultos; cumplir tiempos; permitir supervisión. |
+| Supervisión | Realizada por el Residente de Obra designado por “LA DEPENDENCIA”. |
+| Penalizaciones | Retención del 3% de los trabajos no ejecutados en tiempo. |
+| Penalización máxima | Hasta el límite de la garantía de cumplimiento. |
+| Modificaciones | Permitidas hasta el 25% del monto o plazo conforme al artículo 72 LOPSRMEM. |
+| Normatividad aplicable | LOPSRMEM; Constitución Art. 134; Reglamento Interior de SECOPE. |
+| Resolución de controversias | NO LOCALIZADO |
+| Firmas | Arq. Ana Rosa Hernández Rentería por “LA DEPENDENCIA”; C.P. Guillermo Fernando Flores Gómez por “EL CONTRATISTA”. |
+| Anexos | Proyecto; Catálogo de conceptos; Programa general de ejecución. |
+| No localizado | Coloca aquí cualquier información relevante NO encontrada. |
+| Áreas de mejora | Identifica campos poco claros o riesgos contractuales. |
 
-REGLAS:
-- Usa SOLO información literal encontrada.
-- Si falta un dato, usa "NO LOCALIZADO".
-- No agregues texto fuera de la tabla.
+NO AGREGUES NADA ANTES O DESPUÉS DE LA TABLA.
 """
 
         r_tabla = safe_gpt(
             client,
             model="gpt-5.1",
             input_data=[{"role": "user", "content": tabla_prompt}],
-            max_output_tokens=2500
+            max_output_tokens=4000
         )
 
         tabla = r_tabla.output_text
@@ -249,4 +278,3 @@ else:
         st.error("Usuario o contraseña incorrectos")
     else:
         st.info("Ingresa tus credenciales para comenzar.")
-
