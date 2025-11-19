@@ -13,7 +13,7 @@ import pandas as pd
 # CONFIGURACIÓN BÁSICA DE LA APP
 # ===============================================================
 
-st.set_page_config(page_title="Análisis de Contratos Públicos (IA)", page_icon="📄")
+st.set_page_config(page_title="📄Análisis Inteligente de Documentos Institucionales", page_icon="📄")
 
 # ===============================================================
 # FUNCIÓN DE REINTENTOS ANTI RATE LIMIT (OPENAI)
@@ -320,7 +320,7 @@ if authentication_status:
     st.sidebar.success(f"Bienvenido/a: {name}")
     authenticator.logout("Cerrar sesión", "sidebar")
 
-    st.title("📄 Análisis Inteligente de Contratos de Obra Pública (IA + Exportación)")
+    st.title("📄Análisis Inteligente de Documentos Institucionales")
 
     api_key = st.text_input("Introduce tu clave OpenAI API", type="password")
     archivo = st.file_uploader("Sube tu contrato PDF", type=["pdf"])
@@ -535,6 +535,7 @@ else:
         st.error("Usuario o contraseña incorrectos")
     else:
         st.info("Ingresa tus credenciales para comenzar.")
+
 
 
 
