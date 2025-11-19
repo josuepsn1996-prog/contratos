@@ -408,7 +408,8 @@ REGLAS ESPECÍFICAS POR CAMPO:
 
 3) Monto antes de IVA:
    - Busca el párrafo donde se indique algo como: “El monto total del presente contrato es la cantidad de $ X ... Más el impuesto al valor agregado”.
-   - Devuelve SOLO la cantidad numérica con signo de pesos, tal como aparece en el contrato.
+   - Devuelve SOLO la cantidad numérica con signo de pesos.
+   - Limpia y normaliza el número: usa SIEMPRE el formato $X,XXX,XXX.XX (comas de miles y dos decimales).
    - Por ejemplo: $3,436,646.48
    - NO incluyas el texto en letras, solo el número.
 
@@ -534,5 +535,6 @@ else:
         st.error("Usuario o contraseña incorrectos")
     else:
         st.info("Ingresa tus credenciales para comenzar.")
+
 
 
